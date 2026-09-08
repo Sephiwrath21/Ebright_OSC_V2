@@ -9,9 +9,14 @@ import {
   type ClaimType,
   isClaimType,
   canAccessClaimType,
+  isTaskGatedClaimType,
   MAX_CLAIM_DOCS,
   requiresAttachment,
 } from "@/app/claim/claim-types";
+import {
+  type ClaimTaskGate,
+  getOpenTasksForClaim,
+} from "@/task-manager/data/claim-gate";
 import path from "node:path";
 
 const TRANSPORT_RATE = 0.7;
@@ -45,6 +50,23 @@ export interface ReviewClaimResult {
 function s(formData: FormData, key: string): string {
   const v = formData.get(key);
   return typeof v === "string" ? v.trim() : "";
+}
+
+/** Names up to three blocking tasks, then "and N more" for the rest. */
+function openTaskError(gate: ClaimTaskGate): string {
+  const parts = gate.sample.map((t) => `“${t.title}”`);
+  const hidden = gate.openCount - gate.sample.length;
+  if (hidden > 0) parts.push(`${hidden} more`);
+  const list =
+    parts.length > 1
+      ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`
+      : (parts[0] ?? "");
+  const one = gate.openCount === 1;
+  return (
+    `You still have ${gate.openCount} incomplete Task Manager ${one ? "task" : "tasks"} ` +
+    `for this month: ${list}. Complete ${one ? "it" : "them"} in Task Manager ` +
+    `before submitting this claim.`
+  );
 }
 
 async function saveAttachment(
@@ -132,6 +154,23 @@ export async function submitClaim(
   }
   if (dateStr > monthEndStr) {
     return { ok: false, error: "Claim date must be within the current month." };
+  }
+
+  // Task Manager gate (2026-09-03): refuse the claim while the claimant still
+  // has an open (not DONE/SKIPPED) task in the month being claimed for — the
+  // automatic form of the Finance/CEO "No Claim/Incentive" list this rule has
+  // existed as since 2026-08-18. Placed after the date checks (it needs the
+  // month) and before any Drive upload, so a blocked claim uploads nothing.
+  // getOpenTasksForClaim FAILS OPEN: no Task Manager account, no
+  // TASK_MANAGER_DATABASE_URL in this environment, or a database error all
+  // resolve to "not blocked" — claim submission never depends on Task Manager
+  // being reachable. See src/task-manager/data/claim-gate.ts.
+  if (isTaskGatedClaimType(claimType)) {
+    const gate = await getOpenTasksForClaim(
+      { email: session.user.email, hrfsUserId: user.user_id },
+      claimDate,
+    );
+    if (gate.blocked) return { ok: false, error: openTaskError(gate) };
   }
 
   let amount: number;

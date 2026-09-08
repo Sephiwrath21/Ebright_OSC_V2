@@ -37,10 +37,10 @@ const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
 ];
 
 const STATUS_STYLES: Record<string, string> = {
-  active: "bg-emerald-50 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 ring-emerald-600/20 dark:ring-emerald-500/30",
-  onboarding: "bg-amber-50 dark:bg-amber-900 text-amber-700 dark:text-amber-300 ring-amber-600/20 dark:ring-amber-500/30",
-  inactive: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 ring-slate-500/20",
-  archive: "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 ring-zinc-500/20 dark:ring-zinc-500/30",
+  active: "bg-emerald-50 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-200 ring-emerald-600/20 dark:ring-emerald-700/40",
+  onboarding: "bg-amber-50 dark:bg-amber-900 text-amber-700 dark:text-amber-200 ring-amber-600/20 dark:ring-amber-700/40",
+  inactive: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 ring-slate-500/20 dark:ring-slate-600/40",
+  archive: "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 ring-zinc-500/20 dark:ring-zinc-600/40",
 };
 const STATUS_DOT: Record<string, string> = {
   active: "bg-emerald-500",
@@ -484,7 +484,7 @@ export default function EmployeeListView({
                 type="button"
                 onClick={() => setAdvOpen(true)}
                 aria-label="Advanced filters"
-                className={`h-10 w-10 rounded-lg border flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${hasAdvFilters ? "border-blue-500 bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-300" : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
+                className={`h-10 w-10 rounded-lg border flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${hasAdvFilters ? "border-blue-500 dark:border-blue-500 bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-300" : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
               >
                 <SlidersHorizontal className="w-4 h-4" aria-hidden="true" />
               </button>
@@ -513,7 +513,7 @@ export default function EmployeeListView({
                   {pageRows.map((e) => {
                     const statusKey = e.status ?? "";
                     return (
-                      <tr key={e.id} className="group hover:bg-slate-50/70 dark:hover:bg-slate-800 transition-colors">
+                      <tr key={e.id} className="group hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
                         <td className="px-6 py-3">
                           <div className="flex items-center gap-3">
                             <span className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center justify-center shrink-0">
@@ -522,7 +522,7 @@ export default function EmployeeListView({
                             <div className="min-w-0">
                               <div className="font-medium text-slate-900 dark:text-slate-100 truncate">{e.fullName}</div>
                               {e.pendingOnboarding ? (
-                                <span className="inline-flex items-center mt-0.5 rounded bg-amber-50 dark:bg-amber-900 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300 ring-1 ring-inset ring-amber-600/20 dark:ring-amber-500/30">
+                                <span className="inline-flex items-center mt-0.5 rounded bg-amber-50 dark:bg-amber-900 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-200 ring-1 ring-inset ring-amber-600/20 dark:ring-amber-700/40">
                                   Pending onboarding
                                 </span>
                               ) : (
@@ -687,7 +687,7 @@ function AdvancedFiltersModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
           <h2 id="adv-filter-title" className="text-base font-semibold text-slate-900 dark:text-slate-100">Advanced Filters</h2>
           <button type="button" onClick={onClose} aria-label="Close"
-            className="w-8 h-8 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+            className="w-8 h-8 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -736,13 +736,13 @@ function AdvancedFiltersModal({
                     className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${checked ? "bg-blue-50 dark:bg-blue-900" : "hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
                     <input type="checkbox" checked={checked} onChange={() => toggleField(key)}
                       className="w-4 h-4 rounded border-slate-300 dark:border-slate-500 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0" />
-                    <span className={`text-sm ${checked ? "text-blue-700 dark:text-blue-300 font-medium" : "text-slate-700 dark:text-slate-300"}`}>{label}</span>
+                    <span className={`text-sm ${checked ? "text-blue-700 dark:text-blue-200 font-medium" : "text-slate-700 dark:text-slate-300"}`}>{label}</span>
                   </label>
                 );
               })}
             </div>
             {fieldSet.size > 0 && (
-              <p className="mt-2 text-xs text-blue-600 dark:text-blue-400 font-medium">
+              <p className="mt-2 text-xs text-blue-600 dark:text-blue-300 font-medium">
                 {fieldSet.size} field{fieldSet.size > 1 ? "s" : ""} selected
               </p>
             )}
@@ -755,7 +755,7 @@ function AdvancedFiltersModal({
             Clear all
           </button>
           <button type="button" onClick={onClose}
-            className="h-10 px-5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-800 shadow-sm">
+            className="h-10 px-5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 shadow-sm">
             Apply Filters
           </button>
         </div>
@@ -796,7 +796,7 @@ function DeleteEmployeeModal({
         <div className="p-6">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-900 flex items-center justify-center shrink-0">
-              <CircleAlert className="w-5 h-5 text-red-600 dark:text-red-400" aria-hidden="true" />
+              <CircleAlert className="w-5 h-5 text-red-600 dark:text-red-300" aria-hidden="true" />
             </div>
             <div className="min-w-0">
               <h2 id="delete-modal-title" className="text-base font-semibold text-slate-900 dark:text-slate-100">Delete employee?</h2>
@@ -824,7 +824,7 @@ function DeleteEmployeeModal({
             type="button"
             onClick={onConfirm}
             disabled={isDeleting}
-            className="h-10 px-4 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-800 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+            className="h-10 px-4 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isDeleting ? "Deleting..." : "Delete"}
           </button>
@@ -851,7 +851,7 @@ function OrgUnitSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-10 pl-3 pr-8 rounded-lg border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 text-sm text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer min-w-[200px]"
+        className="h-10 pl-3 pr-8 rounded-lg border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 text-sm text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer min-w-[200px]"
       >
         <option value="">All Branch / Dept</option>
         <optgroup label="Branches">
@@ -889,7 +889,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-10 pl-3 pr-8 rounded-lg border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 text-sm text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer min-w-[160px]"
+        className="h-10 pl-3 pr-8 rounded-lg border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 text-sm text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer min-w-[160px]"
       >
         <option value="">{placeholder}</option>
         {options.map((o) => (

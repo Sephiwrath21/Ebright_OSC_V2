@@ -9,6 +9,15 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 vi.mock("@/lib/ebright-hrfs", () => ({ queryEbrightHrfs: vi.fn() }));
 vi.mock("@/lib/employeeQueries", () => ({ STAFF_ROLE_ID: 6 }));
+// employeeScope reaches @/auth -> next-auth, whose env module imports
+// "next/server" — unresolvable under vitest, so importing it here fails the
+// whole file before a single assertion runs. Same reason the four mocks above
+// exist; this one was simply missed when careerApplicationSync started
+// importing employeeScope. Nothing under test calls either export.
+vi.mock("@/lib/employeeScope", () => ({
+  getCurrentEmployeeScope: vi.fn(),
+  filterRowsByScope: vi.fn((rows: unknown[]) => rows),
+}));
 
 import {
   decideSyncAction,

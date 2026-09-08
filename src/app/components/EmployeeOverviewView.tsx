@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, Home } from "lucide-react";
+import { ChevronRight, Home, User } from "lucide-react";
 import type { EmployeeStage } from "@/lib/employeeStages";
 import type { EmployeeOverviewRow } from "@/lib/employeeQueries";
 import EmployeeStageCards from "@/app/components/EmployeeStageCards";
@@ -23,6 +23,14 @@ interface Props {
    *  the tooltip compute the real day count via probationReminderText.ts
    *  instead of a hardcoded "3 days" — see that file's own comment. */
   probationReminderNames?: { name: string; endDate: string }[];
+  /** CEO's own user_id (2026-08-28, see conversation) — only ever set for a
+   *  CEO account (fresh DB lookup, not session.user.role — see
+   *  employee-folder/page.tsx's own comment on why). Renders a "view my own
+   *  profile" shortcut icon; null/undefined for every other role, since a
+   *  plain staff login already redirects straight to their own record
+   *  before this page ever renders, and every other role has no equivalent
+   *  "jump to myself" need while browsing everyone else. */
+  ceoOwnUserId?: number | null;
 }
 
 // The 5-card summary and the search/filter/table below it are extracted into
@@ -35,7 +43,14 @@ interface Props {
 // the full Employee Records table. EmployeeOverviewSection/
 // DashboardPreviewListCard/NoClaimIncentiveModal/getScopedNoClaimIncentiveList
 // are all left in place, unused for now, for that later placement.
-export default function EmployeeOverviewView({ rows, counts, userName, overdueTaskCounts, probationReminderNames }: Props) {
+export default function EmployeeOverviewView({
+  rows,
+  counts,
+  userName,
+  overdueTaskCounts,
+  probationReminderNames,
+  ceoOwnUserId,
+}: Props) {
   return (
     <div className="min-h-full bg-slate-50 dark:bg-slate-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4 pb-10">
@@ -50,6 +65,17 @@ export default function EmployeeOverviewView({ rows, counts, userName, overdueTa
           </Link>
           <ChevronRight className="w-4 h-4 text-slate-400" aria-hidden="true" />
           <span className="text-slate-900 dark:text-slate-100 font-medium">Employee Folder</span>
+
+          {ceoOwnUserId != null && (
+            <Link
+              href={`/employee-record/${ceoOwnUserId}`}
+              title="View my own profile"
+              aria-label="View my own profile"
+              className="ml-auto flex items-center justify-center w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+            >
+              <User className="w-4 h-4" aria-hidden="true" />
+            </Link>
+          )}
         </nav>
 
         <header className="mb-6">

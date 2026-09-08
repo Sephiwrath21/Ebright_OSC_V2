@@ -52,7 +52,7 @@ export function DailyDatePicker({
   };
   const unit = step === "month" ? "month" : "day";
   const arrowClass =
-    "flex size-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-xs text-gray-500 shadow-sm hover:border-blue-300 hover:text-blue-600 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-400 dark:hover:border-blue-500 dark:hover:text-blue-400";
+    "flex size-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-xs text-gray-500 shadow-sm hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400 dark:hover:border-blue-500 dark:hover:text-blue-400";
 
   return (
     <div className="flex items-center gap-1.5">

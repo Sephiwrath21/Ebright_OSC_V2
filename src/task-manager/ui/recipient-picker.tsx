@@ -29,7 +29,7 @@ const selectClass =
 /** The picker's search-input style — exported so other person pickers (e.g.
  *  the drill modal's "Assign to Others") reuse the exact same look. */
 export const pickerSearchClass =
-  "w-full rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100";
+  "w-full rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-400";
 
 /** "Name · Role" in one truncated span — THE person-row text format, shared
  *  by every list this file renders and by SinglePersonPickList below. */
@@ -52,7 +52,7 @@ export function SinglePersonPickList({
   emptyLabel: string;
 }) {
   if (members.length === 0) {
-    return <p className="py-2 text-center text-xs text-gray-400">{emptyLabel}</p>;
+    return <p className="py-2 text-center text-xs text-gray-400 dark:text-slate-400">{emptyLabel}</p>;
   }
   return (
     <div className="max-h-56 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:ring-1 dark:ring-white/10">
@@ -138,7 +138,7 @@ function MemberDropdown({
   }, [open]);
 
   if (members.length === 0) {
-    return <p className="text-xs text-gray-400">{emptyLabel}</p>;
+    return <p className="text-xs text-gray-400 dark:text-slate-400">{emptyLabel}</p>;
   }
 
   const allSelected = members.every((m) => selected.has(m.id));
@@ -151,10 +151,10 @@ function MemberDropdown({
         onClick={() => setOpen((o) => !o)}
         className={`${selectClass} flex items-center justify-between gap-2`}
       >
-        <span className={selectedCount > 0 ? "text-gray-700 dark:text-slate-100" : "text-gray-400"}>
+        <span className={selectedCount > 0 ? "text-gray-700 dark:text-slate-300" : "text-gray-400 dark:text-slate-400"}>
           {selectedCount > 0 ? `${selectedCount} selected` : "Select people…"}
         </span>
-        <span className="text-gray-400">{open ? "▲" : "▼"}</span>
+        <span className="text-gray-400 dark:text-slate-400">{open ? "▲" : "▼"}</span>
       </button>
 
       {open && (
@@ -162,7 +162,7 @@ function MemberDropdown({
           <button
             type="button"
             onClick={() => onToggleAll(members.map((m) => m.id))}
-            className="block w-full border-b border-gray-100 px-3 py-1.5 text-left text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-400 dark:hover:bg-blue-900"
+            className="block w-full border-b border-gray-100 px-3 py-1.5 text-left text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-400 dark:hover:bg-slate-800"
           >
             {allSelected ? "Deselect all" : (selectAllLabel ?? `Select all (${members.length})`)}
           </button>
@@ -179,7 +179,9 @@ function MemberDropdown({
               >
                 <span
                   className={`flex size-3.5 shrink-0 items-center justify-center rounded border ${
-                    isSelected ? "border-blue-600 bg-blue-600 text-white" : "border-gray-300 dark:border-slate-500"
+                    isSelected
+                      ? "border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500"
+                      : "border-gray-300 dark:border-slate-500"
                   }`}
                 >
                   {isSelected && <CheckIcon />}
@@ -214,10 +216,10 @@ function MenuCard({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-2xl border border-gray-200 bg-white p-4 text-left transition-colors hover:border-blue-400 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-600 dark:hover:bg-blue-900"
+      className="rounded-2xl border border-gray-200 bg-white p-4 text-left transition-colors hover:border-blue-400 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-500 dark:hover:bg-blue-900"
     >
       <p className="text-sm font-semibold text-gray-700 dark:text-slate-300">{label}</p>
-      <p className="mt-0.5 text-xs text-gray-400">{hint}</p>
+      <p className="mt-0.5 text-xs text-gray-400 dark:text-slate-400">{hint}</p>
     </button>
   );
 }
@@ -319,7 +321,7 @@ export function RecipientPicker({
         <button
           type="button"
           onClick={() => onChange([])}
-          className="text-xs font-medium text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
+          className="text-xs font-medium text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-300"
         >
           Clear all
         </button>
@@ -367,7 +369,7 @@ export function RecipientPicker({
             </select>
           )}
           {needsSub && !groupSub ? (
-            <p className="text-xs text-gray-400">Pick a department above.</p>
+            <p className="text-xs text-gray-400 dark:text-slate-400">Pick a department above.</p>
           ) : (
             <MemberDropdown
               members={groupResults}
@@ -447,9 +449,9 @@ export function RecipientPicker({
           )}
 
           {groupValue === null ? (
-            <p className="text-xs text-gray-400">Pick a group to see staff.</p>
+            <p className="text-xs text-gray-400 dark:text-slate-400">Pick a group to see staff.</p>
           ) : needsSub && !groupSub ? (
-            <p className="text-xs text-gray-400">Pick a department above.</p>
+            <p className="text-xs text-gray-400 dark:text-slate-400">Pick a department above.</p>
           ) : (
             <MemberDropdown
               members={groupResults}

@@ -38,6 +38,21 @@ async function requireNotCeoUnlessOwnProfile(userId?: number): Promise<ActionRes
   return { ok: false, error: "CEO accounts can only edit their own profile." };
 }
 
+// UI-side mirror of the check above, as a plain boolean for gating whether a
+// profile page even shows the Edit affordance (2026-08-28, see conversation)
+// — deliberately a FRESH DB lookup, not the session JWT's own cached
+// role/id. The 3 profile-page callers previously read `session.user.role`/
+// `session.user.id` directly; those are only as fresh as the JWT was at
+// login time, so any session issued before this feature existed (or before
+// this particular account's role was set up) would carry an empty role and
+// silently fail OPEN — showing Edit to a CEO viewing someone else's profile.
+// Reusing requireNotCeoUnlessOwnProfile here keeps this in one place and
+// means the display always reflects the CURRENT database role, matching
+// exactly what the underlying server action would actually allow.
+export async function canEditProfile(viewedUserId: number): Promise<boolean> {
+  return (await requireNotCeoUnlessOwnProfile(viewedUserId)) === null;
+}
+
 // Every mutation below targets a specific employee (userId, always the first
 // parameter) — this blocks a department/branch-scoped account from writing
 // to an out-of-scope employee's record via a direct action call, not just

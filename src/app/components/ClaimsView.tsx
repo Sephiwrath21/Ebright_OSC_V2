@@ -100,7 +100,7 @@ const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string; labe
   pending: { bg: "var(--tint-amber)", text: "var(--accent-amber-strong)", dot: "var(--accent-amber)", label: "Pending" },
   approved: { bg: "var(--tint-green)", text: "var(--accent-green-strong)", dot: "var(--accent-green)", label: "Approved" },
   rejected: { bg: "var(--tint-red)", text: "var(--accent-red-strong)", dot: "var(--accent-red)", label: "Rejected" },
-  disbursed: { bg: "#FAF5FF", text: "#6B21A8", dot: "#A855F7", label: "Disbursed" },
+  disbursed: { bg: "var(--status-violet-bg)", text: "var(--status-violet-fg)", dot: "var(--accent-violet-strong)", label: "Disbursed" },
   received: { bg: "var(--tint-green)", text: "var(--accent-green-strong)", dot: "var(--accent-green)", label: "Received" },
 };
 
@@ -218,7 +218,7 @@ export default function ClaimsView({
           year: "numeric",
         }),
         value: count,
-        color: "#3B82F6",
+        color: "var(--accent-blue)",
         segments: CLAIM_TYPES.filter((t) => (byType.get(t.id) ?? 0) > 0).map((t) => ({
           key: t.id,
           label: t.shortLabel,
@@ -342,7 +342,7 @@ export default function ClaimsView({
             </p>
             {cycleSteps.some((s) => s.day === currentDay) && (
               <span
-                className="inline-flex items-center rounded-full bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 px-3 py-1 text-xs font-semibold"
+                className="inline-flex items-center rounded-full bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 px-3 py-1 text-xs font-semibold"
               >
                 Deadline today!
               </span>
@@ -364,10 +364,10 @@ export default function ClaimsView({
                     style={{ flexShrink: 0 }}
                     className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border whitespace-nowrap transition-all ${
                       isSubmissionStep
-                        ? "bg-red-50 dark:bg-red-900 border-red-300 dark:border-red-700 ring-2 ring-red-200 dark:ring-red-800"
+                        ? "bg-red-50 dark:bg-red-900 border-red-300 dark:border-red-700 ring-2 ring-red-200 dark:ring-red-700"
                         : isPast
-                        ? "bg-emerald-50 dark:bg-emerald-900 border-emerald-300 dark:border-emerald-700 ring-2 ring-emerald-200 dark:ring-emerald-800"
-                        : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                        ? "bg-emerald-50 dark:bg-emerald-900 border-emerald-300 dark:border-emerald-700 ring-2 ring-emerald-200 dark:ring-emerald-700"
+                        : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-800"
                     }`}
                   >
                     <span
@@ -401,7 +401,7 @@ export default function ClaimsView({
                         flex: "1 1 0%",
                         height: "2px",
                         margin: "0 8px",
-                        backgroundColor: isPast ? "#60a5fa" : "#bfdbfe",
+                        backgroundColor: isPast ? "var(--accent-blue)" : "var(--status-track)",
                       }}
                     />
                   )}
@@ -479,7 +479,7 @@ export default function ClaimsView({
                       className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900 focus-visible:ring-blue-400 ${
                         isActive
                           ? "border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 ring-1 ring-slate-200 dark:ring-slate-700"
-                          : "border-slate-200 dark:border-slate-700"
+                          : "border-slate-200 dark:border-slate-800"
                       }`}
                     >
                       <span
@@ -508,7 +508,7 @@ export default function ClaimsView({
                   className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50/50 dark:hover:bg-blue-900/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900 focus-visible:ring-blue-400 ${
                     statusFilter === ""
                       ? "border-blue-200 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/50 ring-1 ring-blue-200 dark:ring-blue-800"
-                      : "border-slate-200 dark:border-slate-700"
+                      : "border-slate-200 dark:border-slate-800"
                   }`}
                 >
                   <span
@@ -821,7 +821,7 @@ export default function ClaimsView({
                           <Link
                             href={`/claim/${c.claimId}`}
                             aria-label={`View ${c.displayId}`}
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
                           >
                             <Eye className="w-4 h-4" aria-hidden="true" />
                           </Link>

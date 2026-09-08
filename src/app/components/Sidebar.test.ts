@@ -31,12 +31,20 @@ describe("Sidebar nav config", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("gives every external item an absolute https:// URL", () => {
+  it("gives every external item a followable href", () => {
+    // What this guards is the SMS bug: an `external` entry that the renderer
+    // hands to a plain <a> with nothing usable to navigate to. Two shapes are
+    // legitimate. A different app entirely (SMS, Inventory) is an absolute
+    // https:// URL. A route of THIS app can also be marked external —
+    // Flowghan renders its own full-page chrome, so it opens in a new tab
+    // instead of inside the portal shell — and its href is a same-app
+    // absolute path. Both are followable; an empty or fragment-only href is
+    // the thing that must still fail.
     const externalItems = allItems.filter((item) => item.external);
 
     expect(externalItems.length).toBeGreaterThan(0);
     for (const item of externalItems) {
-      expect(item.href).toMatch(/^https:\/\//);
+      expect(item.href).toMatch(/^(?:https:\/\/|\/)/);
     }
   });
 

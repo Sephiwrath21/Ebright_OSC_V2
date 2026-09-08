@@ -69,8 +69,32 @@ export default function EmployeeNamelistView({ stage, groupBy, locationCode, loc
   // Full Time. Falls back to positionGroup(row.position) only when
   // resolvedPositionType is unset (manually-added people with no
   // BranchStaff match, same population that keeps local position for
-  // display too).
-  const effectiveGroup = (row: EmployeeOverviewRow): PositionGroup => row.resolvedPositionType ?? positionGroup(row.position);
+  // display too). (positionGroup() itself was fixed 2026-08-13 to also
+  // recognize the bare "INT" abbreviation directly — see employeeStages.ts's
+  // own comment — so it's now safe to fall back to it below without
+  // reintroducing the exact abbreviation bug this whole preference was
+  // originally written to avoid.)
+  //
+  // Employee-Folder-only correction (2026-09-04, see conversation) —
+  // resolveEffectivePositionGroup prefers BranchStaff.employment_type over
+  // .role whenever employment_type is merely non-blank, even when it's a
+  // generic value like "Contract" that doesn't actually indicate Full/Part/
+  // Intern at all (confirmed live: Chow Chin Hui, employment_type="Contract",
+  // role="PT Coach" — resolvedPositionType still comes back "Full Time",
+  // silently outranking her own displayed position text). Deliberately NOT
+  // fixed in resolveEffectivePositionGroup itself (shared app-wide — filters,
+  // tables, and every other namelist all read it too); this trusts the
+  // row's own displayed position text over a "Full Time" resolution instead,
+  // scoped entirely to this one view via effectiveGroup, which is the only
+  // thing every other screen doesn't also call.
+  const effectiveGroup = (row: EmployeeOverviewRow): PositionGroup => {
+    const resolved = row.resolvedPositionType ?? positionGroup(row.position);
+    if (resolved === "Full Time") {
+      const fromDisplayedPosition = positionGroup(row.position);
+      if (fromDisplayedPosition !== "Full Time") return fromDisplayedPosition;
+    }
+    return resolved;
+  };
 
   const matchesFilters = (row: EmployeeOverviewRow) => {
     const q = search.trim().toLowerCase();

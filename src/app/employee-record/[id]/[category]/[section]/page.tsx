@@ -46,17 +46,17 @@ import { findRecordCategory } from "@/lib/employeeRecordConfig";
 import { positionGroup } from "@/lib/employeeStages";
 import { getRealAccountLifecycleOverride } from "@/lib/careerApplicationSync";
 import { getProbationDisplayInfo } from "@/lib/probationDecision";
+import { canEditProfile } from "@/lib/employeeRecordActions";
+import { getCurrentEmployeeScope } from "@/lib/employeeScope";
 import {
   PRE_VISIBLE_SECTIONS,
-  PRE_NEW_SECTIONS,
   onboardingVisibleSections,
-  onboardingNewSections,
   activeVisibleSections,
-  activeNewSections,
   exitVisibleSections,
-  exitNewSections,
   isSectionEmpty,
   entirelyNewCategories,
+  normalizeStageForVisibility,
+  newSectionsForStage,
 } from "@/lib/employeeVisibleSections";
 
 export const dynamic = "force-dynamic";
@@ -64,42 +64,17 @@ export const dynamic = "force-dynamic";
 // Employee Record's own effective-stage resolution (2026-08-27, see
 // conversation) — reuses the exact same override lookup the stage-folder
 // pages already use (getRealAccountLifecycleOverride), not a separate
-// re-derivation. A Probation-effective employee (override.stage ===
-// "probation", which per that function's own source always pairs with
-// extraStages: ["onboarding"] — Probation is inherently an Onboarding
-// sub-state, never reached any other way) is deliberately mapped to
-// ONBOARDING's own visible/new-section functions, not a Probation-specific
-// one — Onboarding's set is already the superset (its HR Info list already
-// includes "probation" as a sub-tab), so showing the narrower Probation-only
-// set here would be a regression relative to what Onboarding already shows.
-// This mapping intentionally ignores extraStages — checking stage ===
-// "probation" alone is sufficient (confirmed via the override's own source).
-function normalizeStageForVisibility(stage: EmployeeStage): "pre" | "onboarding" | "active" | "exit" {
-  if (stage === "probation") return "onboarding";
-  if (stage === "pre" || stage === "onboarding" || stage === "active" || stage === "exit") return stage;
-  return "pre";
-}
-
+// re-derivation. normalizeStageForVisibility/newSectionsForStage moved into
+// employeeVisibleSections.ts (2026-08-28, see conversation) so the
+// /employee-record/[id] redirect shim can share the exact same "what's new"
+// computation for its own default-landing-section logic, instead of a second
+// re-derivation drifting out of sync with this one.
 function visibleSectionsForStage(stage: EmployeeStage, isFullTime: boolean): Record<string, string[]> {
   const normalized = normalizeStageForVisibility(stage);
   if (normalized === "pre") return PRE_VISIBLE_SECTIONS;
   if (normalized === "onboarding") return onboardingVisibleSections(isFullTime);
   if (normalized === "active") return activeVisibleSections(isFullTime);
   return exitVisibleSections(isFullTime);
-}
-
-// Same normalization for the red-dot "what's new" tracking — kept in sync
-// with visibleSectionsForStage above rather than a separate rule, since dots
-// only make sense relative to whatever set of sections is actually visible
-// (a Probation-effective employee seeing Onboarding's fuller set should also
-// get Onboarding's own "what's new" tracking, e.g. Doc/Tax Info, not just
-// Probation's narrower "just the Probation sub-tab" one).
-function newSectionsForStage(stage: EmployeeStage): string[] {
-  const normalized = normalizeStageForVisibility(stage);
-  if (normalized === "pre") return PRE_NEW_SECTIONS;
-  if (normalized === "onboarding") return onboardingNewSections();
-  if (normalized === "active") return activeNewSections();
-  return exitNewSections();
 }
 
 interface Props {
@@ -333,11 +308,29 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
   const userEmail = session.user.email;
   const userRole = (session.user as { role?: string }).role ?? "";
   const userName = session.user.name ?? null;
-  const canEdit = userRole.toLowerCase() !== "ceo" || String(employee.id) === (session.user as { id?: string }).id;
+  // Fresh DB lookup (2026-08-28, see conversation), not session.user.role/id
+  // — those are only as fresh as the JWT was at login time, so a session
+  // issued before this account's role existed would silently fail open.
+  const canEdit = await canEditProfile(employee.id);
   // Gates the "+ Add Item" affordance on Offboarding's 3 Clearance
   // checklists — same role check every other Clearance/Probation
   // "+ Add"/decision gate in this app already uses.
   const canAddChecklistItem = ["hr", "superadmin"].includes(userRole.toLowerCase());
+
+  // Breadcrumb (2026-08-28, see conversation) — this route is never reached
+  // via the Employee Overview -> stage -> branch/department drill-down
+  // (EmployeeNamelistView links to the stage-folder route for that; this one
+  // is reached via EmployeeRecordsTable's cross-stage table, the ownUserId
+  // self-redirect below, or the new CEO shortcut icon), so it never derives
+  // a stage/location crumb — only two shapes: a scope-limited viewer who can
+  // only ever see their own record here gets "Employee Folder" instead of
+  // "Employee Overview" (matching how they actually reached this page, via
+  // employee-folder/page.tsx's own redirect), everyone else keeps the
+  // default "Employee Overview" prefix. Either way the final crumb is the
+  // employee's own name, not the generic "Employee Record".
+  const scope = await getCurrentEmployeeScope();
+  const isOwnRecordOnly = scope?.ownUserId != null && scope.ownUserId === employee.id;
+  const breadcrumbMiddle = isOwnRecordOnly ? [{ label: "Employee Folder", href: "/employee-folder" }] : undefined;
 
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
@@ -352,6 +345,8 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
         departmentName={employee.departmentName}
         stage={effectiveStage}
         employeeCode={employee.employeeId}
+        breadcrumbLabel={employee.fullName}
+        breadcrumbMiddle={breadcrumbMiddle}
         employeeDetail={employeeDetail}
         leaveHistory={leaveHistory}
         resumeInfo={resumeInfo}

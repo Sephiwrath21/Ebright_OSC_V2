@@ -279,7 +279,7 @@ export default async function ManpowerSchedulePage({
       <div className="mx-auto flex max-w-[1400px] flex-col gap-6 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold">Manpower Schedule</h1>
+            <h1 className="text-2xl font-bold dark:text-slate-100">Manpower Schedule</h1>
             <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
               Plan the day&apos;s staffing grid — assignments sync to each coach&apos;s task list on
               publish.

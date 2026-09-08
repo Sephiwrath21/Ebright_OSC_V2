@@ -35,7 +35,7 @@ const C = {
 // to-do circle) — swapping these to the lighter dark-mode --status-*-fg
 // tone would drop white-on-fill contrast, so they stay literal.
 const SOLID = {
-  green: "#1D9E75",
+  green: "var(--status-green-fg)",
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -329,13 +329,13 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail, task
                     Profile complete
                   </span>
                 </div>
-                <p className="text-sm text-slate-600 mt-0.5 dark:text-slate-300">
+                <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5">
                   {v?.position || "—"}{v?.department ? ` · ${v.department}` : ""}
                 </p>
               </div>
             </div>
 
-            <dl className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
+            <dl className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
               <InfoRow icon={<UserCircle2  className="w-3.5 h-3.5" />} label="Employee ID" value={v?.employeeId || "—"} />
               <InfoRow icon={<Building2    className="w-3.5 h-3.5" />} label="Department"  value={v?.department || "—"} />
               <InfoRow icon={<Building2    className="w-3.5 h-3.5" />} label="Branch"      value={v?.branchName || "—"} />
@@ -378,7 +378,7 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail, task
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">To-do / pending actions</h3>
-                <p className="text-xs text-slate-500 mt-0.5 dark:text-slate-400">Tap to mark complete</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Tap to mark complete</p>
               </div>
               <span
                 className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold"
@@ -413,7 +413,7 @@ export default function EmployeeSelfServiceDashboard({ userName, userEmail, task
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Card({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-2xl bg-white p-5 border border-slate-200 dark:bg-slate-900 dark:border-slate-800">{children}</div>;
+  return <div className="rounded-2xl bg-white dark:bg-slate-900 p-5 border border-slate-200 dark:border-slate-800">{children}</div>;
 }
 
 function CardHeader({ title, subtitle, icon }: { title: string; subtitle?: string; icon?: React.ReactNode }) {
@@ -422,7 +422,7 @@ function CardHeader({ title, subtitle, icon }: { title: string; subtitle?: strin
       {icon && <span className="mt-0.5">{icon}</span>}
       <div>
         <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">{title}</h3>
-        {subtitle && <p className="text-xs text-slate-500 mt-0.5 dark:text-slate-400">{subtitle}</p>}
+        {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</p>}
       </div>
     </div>
   );
@@ -438,12 +438,12 @@ function MetricCard({
   trend?: { tone: "up" | "down"; text: string };
 }) {
   return (
-    <div className="rounded-2xl bg-white border border-slate-200 p-4 dark:bg-slate-900 dark:border-slate-800">
-      <div className="flex items-center gap-2 text-slate-500 mb-2 dark:text-slate-400">
+    <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4">
+      <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 mb-2">
         {icon}
         <span className="text-[11px] font-bold uppercase tracking-wider">{label}</span>
       </div>
-      <p className="text-3xl font-black text-slate-900 leading-none dark:text-slate-100">{value}</p>
+      <p className="text-3xl font-black text-slate-900 dark:text-slate-100 leading-none">{value}</p>
       {trend ? (
         <p className="text-[11px] font-semibold mt-2"
            style={{ color: trend.tone === "up" ? C.green : C.red }}>
@@ -490,11 +490,11 @@ function WeekRow({ day, state, label, justification, onJustify }: {
   onJustify?: () => void;
 }) {
   const tone =
-    state === "ontime"    ? { bg: "var(--status-green-bg)", fg: C.green,   w: "85%"  }
-    : state === "late"    ? { bg: "var(--status-amber-bg-strong)", fg: C.amber,   w: "60%"  }
-    : state === "absent"  ? { bg: "var(--status-red-bg)", fg: C.red,     w: "40%"  }
-    : state === "holiday" ? { bg: "var(--status-violet-bg)", fg: "var(--status-violet-fg)", w: "100%" }
-    :                       { bg: "var(--status-neutral-bg)", fg: "var(--status-neutral-fg)", w: "0%"   };
+    state === "ontime"    ? { bg: "var(--status-green-bg)",       fg: C.green,                     w: "85%"  }
+    : state === "late"    ? { bg: "var(--status-amber-bg-strong)", fg: C.amber,                    w: "60%"  }
+    : state === "absent"  ? { bg: "var(--status-red-bg)",         fg: C.red,                       w: "40%"  }
+    : state === "holiday" ? { bg: "var(--status-violet-bg)",      fg: "var(--status-violet-fg)",    w: "100%" }
+    :                       { bg: "var(--status-neutral-bg)",     fg: "var(--status-neutral-fg)",   w: "0%"   };
 
   const labelColor =
     state === "today" || state === "upcoming" ? "var(--status-neutral-fg)" : tone.fg;
@@ -513,7 +513,7 @@ function WeekRow({ day, state, label, justification, onJustify }: {
   const rowInner = (
     <>
       <span className="w-8 text-[11px] font-bold text-slate-500 dark:text-slate-400 shrink-0">{day}</span>
-      <div className="flex-1 h-7 rounded-lg bg-slate-100 overflow-hidden relative dark:bg-slate-800">
+      <div className="flex-1 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden relative">
         <div className="h-full rounded-lg transition-all" style={{ width: tone.w, background: tone.bg }} />
         <span
           className="absolute inset-0 flex items-center px-2.5 text-[11px] font-semibold"
@@ -561,7 +561,7 @@ function WeekStat({ label, value, tone }: {
     : C.red;
 
   return (
-    <div className="rounded-xl bg-slate-50 px-3 py-2.5 dark:bg-slate-800">
+    <div className="rounded-xl bg-slate-50 dark:bg-slate-800 px-3 py-2.5">
       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</p>
       <p className="text-base font-black mt-0.5" style={{ color: fg }}>{value}</p>
     </div>
@@ -571,8 +571,8 @@ function WeekStat({ label, value, tone }: {
 function TodoRow({ t, onToggle }: { t: TodoItem; onToggle: () => void }) {
   const pillStyle = (() => {
     switch (t.pill?.tone) {
-      case "blue":  return { bg: "var(--status-blue-bg)", fg: C.blue };
-      case "red":   return { bg: "var(--status-red-bg)", fg: C.red  };
+      case "blue":  return { bg: "var(--status-blue-bg)",  fg: C.blue };
+      case "red":   return { bg: "var(--status-red-bg)",   fg: C.red  };
       case "amber": return { bg: "var(--status-amber-bg)", fg: C.amber };
       case "green": return { bg: "var(--status-green-bg)", fg: C.green };
       default:      return { bg: "var(--status-neutral-bg)", fg: "var(--status-neutral-fg-strong)" };
@@ -611,13 +611,13 @@ function TodoRow({ t, onToggle }: { t: TodoItem; onToggle: () => void }) {
             )}
           </div>
           {t.subtitle && (
-            <p className={`text-xs mt-0.5 ${t.done ? "text-slate-300 line-through" : "text-slate-500 dark:text-slate-400"}`}>
+            <p className={`text-xs mt-0.5 ${t.done ? "text-slate-300 dark:text-slate-600 line-through" : "text-slate-500 dark:text-slate-400"}`}>
               {t.subtitle}
             </p>
           )}
           {typeof t.progress === "number" && !t.done && (
             <div className="mt-2 flex items-center gap-2">
-              <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden dark:bg-slate-800">
+              <div className="flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                 <div className="h-full rounded-full transition-all"
                      style={{ width: `${t.progress}%`, background: C.blue }} />
               </div>
@@ -635,12 +635,12 @@ function TodoRow({ t, onToggle }: { t: TodoItem; onToggle: () => void }) {
 function Announcement({ title, body, tag }: { title: string; body: string; tag: string }) {
   return (
     <div
-      className="rounded-xl bg-slate-50 pl-4 pr-3 py-3 border-l-4 hover:bg-slate-100/70 transition-colors cursor-pointer flex items-start justify-between gap-2 dark:bg-slate-800 dark:hover:bg-slate-800/70"
+      className="rounded-xl bg-slate-50 dark:bg-slate-800 pl-4 pr-3 py-3 border-l-4 hover:bg-slate-100/70 dark:hover:bg-slate-700/70 transition-colors cursor-pointer flex items-start justify-between gap-2"
       style={{ borderLeftColor: C.blue }}
     >
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-bold text-slate-800 truncate dark:text-slate-200">{title}</p>
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{title}</p>
           <span
             className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
             style={{ background: "var(--status-blue-bg)", color: C.blue }}
@@ -648,9 +648,9 @@ function Announcement({ title, body, tag }: { title: string; body: string; tag: 
             {tag}
           </span>
         </div>
-        <p className="text-xs text-slate-500 mt-0.5 dark:text-slate-400">{body}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{body}</p>
       </div>
-      <ChevronRight className="w-4 h-4 text-slate-300 mt-1 shrink-0" />
+      <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 mt-1 shrink-0" />
     </div>
   );
 }
@@ -658,11 +658,11 @@ function Announcement({ title, body, tag }: { title: string; body: string; tag: 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2.5">
-      <dt className="flex items-center gap-2 text-xs text-slate-500 font-medium dark:text-slate-400">
+      <dt className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-medium">
         <span className="text-slate-400">{icon}</span>
         {label}
       </dt>
-      <dd className="text-sm font-semibold text-slate-800 truncate dark:text-slate-200">{value}</dd>
+      <dd className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{value}</dd>
     </div>
   );
 }

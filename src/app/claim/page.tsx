@@ -9,6 +9,8 @@ import ClaimsView, {
 } from "@/app/components/ClaimsView";
 import { buildAccess } from "@/lib/access/engine";
 import { claimListWhere } from "@/lib/access/claimScope";
+import ClaimBlockedNotice from "@/app/claim/ClaimBlockedNotice";
+import { claimTaskBlock } from "@/app/claim/task-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,23 @@ export default async function ClaimsPage({
 
   const access = await buildAccess(session.user.email);
   if (!access) redirect("/login");
+
+  // Task Manager gate (2026-09-03): the claim pages do not open while the
+  // viewer still has an unfinished task this month. Checked before the claim
+  // queries below, so a blocked visit does no work. Reviewers are exempt —
+  // see claim/task-gate.ts for why.
+  const taskBlock = await claimTaskBlock(session.user.email, access);
+  if (taskBlock) {
+    return (
+      <AppShell
+        email={session.user.email}
+        role={(session.user as { role?: string } | undefined)?.role ?? ""}
+        name={session.user?.name ?? null}
+      >
+        <ClaimBlockedNotice gate={taskBlock} />
+      </AppShell>
+    );
+  }
 
   const viewScope = access.scope("claim", "view"); // global | team | own | null
   const canReviewAll = viewScope === "global"; // finance/HR/superadmin (+ceo view)

@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import AppShell from "@/app/components/AppShell";
 import EmployeeRecordView from "@/app/components/EmployeeRecordView";
 import { findRecordCategory } from "@/lib/employeeRecordConfig";
+import { canEditProfile } from "@/lib/employeeRecordActions";
 import {
   isEmployeeStage,
   getEmployeeOverviewRowById,
@@ -69,7 +70,7 @@ import {
   type FinancialSettlementInfo,
 } from "@/lib/employeeQueries";
 import { positionGroup } from "@/lib/employeeStages";
-import { STAGE_PROFILE_CONFIG } from "@/lib/stageProfileConfig";
+import { STAGE_PROFILE_CONFIG, STAGE_PROCEED_BUTTON } from "@/lib/stageProfileConfig";
 import { getRealAccountLifecycleOverride, computePreStartDatePassedRows } from "@/lib/careerApplicationSync";
 import { getProbationDisplayInfo } from "@/lib/probationDecision";
 import {
@@ -135,7 +136,11 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
   // stage label on the breadcrumb/URL.
   if (isCandidate && stage !== "pre" && stage !== "onboarding") notFound();
 
-  let employee: { id: number; fullName: string };
+  // branchCode/departmentCode widened onto this (2026-08-28, see
+  // conversation) — needed to build the breadcrumb's own branch/department
+  // crumb link; a candidate never has either (Pre/Probation never reach here
+  // with a location layer), so both stay undefined for that branch below.
+  let employee: { id: number; fullName: string; branchCode?: string | null; departmentCode?: string | null };
   let employeeDetail;
   if (isCandidate) {
     const candidate = await getOnboardingCandidateDetail(-numId);
@@ -320,8 +325,32 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
   // server-side in employeeRecordActions.ts via requireNotCeoUnlessOwnProfile
   // (see requireEmployeeInScope). This is the cosmetic mirror: hide every
   // panel's Edit/Save toggle when a CEO is looking at someone else's
-  // profile, so they don't see a button that would only ever 403.
-  const canEdit = userRole.toLowerCase() !== "ceo" || String(employee.id) === (session.user as { id?: string }).id;
+  // profile, so they don't see a button that would only ever 403. Fresh DB
+  // lookup (2026-08-28, see conversation), not session.user.role/id — those
+  // are only as fresh as the JWT was at login time, so a session issued
+  // before this account's role existed would silently fail open.
+  const canEdit = await canEditProfile(employee.id);
+
+  // "Proceed"/"Next"/"Exit" advance-to-next-stage button (2026-08-28, see
+  // conversation) — ported from StageProfileView.tsx's own original
+  // implementation, ONLY for the 3 stages that still have one: Probation has
+  // its own Confirm/Extend/Stop decision instead (STAGE_PROCEED_BUTTON has no
+  // "probation" entry), and Exit is terminal (no "exit" entry either) — per
+  // explicit decision, neither gets a next-stage button here. Pre's own
+  // target depends on position (Full Time goes to Probation, everything else
+  // skips straight to Onboarding) rather than the static nextStage every
+  // other stage's entry uses. A Full Time person dual-listed in both
+  // Onboarding and Probation can only reach Active via Probation's own
+  // Confirm decision — Onboarding's "Next" is Part Time/Intern only, so the
+  // button is hidden (not just server-rejected) for that case, same as
+  // StageProfileView.tsx's own showProceedButton check.
+  const proceedButtonConfig = STAGE_PROCEED_BUTTON[stage];
+  const proceedTargetStage = stage === "pre" ? (isFullTime ? "probation" : "onboarding") : proceedButtonConfig?.nextStage;
+  const showProceedButton = Boolean(proceedButtonConfig) && !(stage === "onboarding" && isFullTime);
+  const proceedButton =
+    showProceedButton && proceedButtonConfig && proceedTargetStage
+      ? { label: proceedButtonConfig.label, targetStage: proceedTargetStage }
+      : undefined;
 
   // Pre, Probation, Onboarding, Active, and now Exit (2026-08-27, see
   // conversation — Exit added this round, the last stage) — all five fully
@@ -346,7 +375,7 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
           : stage === "probation"
             ? probationVisibleSections(isFullTime)
             : onboardingVisibleSections(isFullTime);
-    const breadcrumbLabel = isExit
+    const stageLabel = isExit
       ? "Exit"
       : isActive
         ? "Active"
@@ -355,6 +384,26 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
           : stage === "probation"
             ? "Probation"
             : "Onboarding";
+    // Breadcrumb now reflects the actual drill-down structure (2026-08-28,
+    // see conversation) — this route is only ever reached via Employee
+    // Overview -> stage -> branch/department -> employee (EmployeeNamelistView
+    // is the only thing that links here), so the crumbs always derive from
+    // that, regardless of who's viewing (no CEO/self special-casing needed
+    // here — see conversation for why that lives on the generic
+    // /employee-record/[id] route instead). Same departmentName ?? branchName
+    // precedence the "Branch/Dept · Position" line below already uses,
+    // paired with the matching *Code for the crumb's own link target — a
+    // Pre-stage candidate has neither (no location layer reaches here for
+    // them), so the crumb is simply omitted rather than a dead link.
+    const locationName = employeeDetail?.departmentName ?? employeeDetail?.branchName ?? null;
+    const locationCode = employeeDetail?.departmentName ? employee.departmentCode : employee.branchCode;
+    const locationGroupSegment = employeeDetail?.departmentName ? "department" : "branch";
+    const breadcrumbMiddle = [
+      { label: "Employee Overview", href: "/employee-folder" },
+      { label: stageLabel, href: `/employee-folder/${stage}` },
+      ...(locationName && locationCode ? [{ label: locationName, href: `/employee-folder/${stage}/${locationGroupSegment}/${locationCode}` }] : []),
+    ];
+    const breadcrumbLabel = employee.fullName;
     // Red dot + default-tab (2026-08-26, see conversation) — newSectionKeys
     // is per-stage (Pre has none); dotSectionKeys narrows that down to just
     // the ones still genuinely empty; the default category/sectionKey opens
@@ -431,10 +480,12 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
           // glance at an earlier one).
           canDecideProbation={stage === "probation" ? canDecideProbation : false}
           canEdit={canEdit}
+          proceedButton={proceedButton}
           visibleSectionKeys={visibleSectionKeys}
           categoryNavigationMode="client"
           basePath={`/employee-folder/${stage}/employee/${employee.id}`}
           breadcrumbLabel={breadcrumbLabel}
+          breadcrumbMiddle={breadcrumbMiddle}
           dotSectionKeys={dotSectionKeys}
           dotCategoryOnlyKeys={dotCategoryOnlyKeys}
           ndaInfo={ndaInfo}

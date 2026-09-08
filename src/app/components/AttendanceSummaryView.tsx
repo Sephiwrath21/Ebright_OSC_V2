@@ -226,7 +226,7 @@ export default function AttendanceSummaryView({ data }: { data: SummaryData }) {
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
           <Link
             href="/home"
-            className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 rounded"
+            className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 rounded"
           >
             <Home className="w-4 h-4" aria-hidden="true" />
             <span>Home</span>
@@ -280,7 +280,7 @@ export default function AttendanceSummaryView({ data }: { data: SummaryData }) {
                 onChange={(e) => onChangeDate(e.target.value)}
                 disabled={isPending}
                 aria-label="Select date"
-                className="w-5 h-5 ml-1 opacity-70 hover:opacity-100 cursor-pointer"
+                className="w-5 h-5 ml-1 opacity-70 hover:opacity-100 cursor-pointer dark:[color-scheme:dark]"
               />
               {isToday ? (
                 <span className="ml-2 text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Today</span>
@@ -300,7 +300,7 @@ export default function AttendanceSummaryView({ data }: { data: SummaryData }) {
             type="button"
             onClick={onPullHistory}
             disabled={pulling || isPending}
-            className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900 text-blue-700 dark:text-blue-300 text-sm font-semibold hover:bg-blue-50 dark:hover:bg-blue-900 hover:border-blue-300 dark:hover:border-blue-700 transition-colors disabled:opacity-60"
+            className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-blue-200 dark:border-blue-700 bg-white dark:bg-slate-900 text-blue-700 dark:text-blue-300 text-sm font-semibold hover:bg-blue-50 dark:hover:bg-blue-900 hover:border-blue-300 dark:hover:border-blue-600 transition-colors disabled:opacity-60"
           >
             <Database className={`w-4 h-4 ${pulling ? "animate-pulse" : ""}`} aria-hidden="true" />
             {pulling ? "Pulling…" : "Pull History"}
@@ -348,7 +348,7 @@ export default function AttendanceSummaryView({ data }: { data: SummaryData }) {
         {/* Info banner */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 rounded-xl border border-blue-100 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-900/40">
           <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-            <Info className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0" aria-hidden="true" />
+            <Info className="w-4 h-4 text-blue-500 shrink-0" aria-hidden="true" />
             <span>
               Live sync from office scanner. 1st scan = <strong className="text-blue-700 dark:text-blue-300">Check-In</strong>.
               Subsequent scans update <strong className="text-rose-700 dark:text-rose-300">Check-Out</strong>. Records reset at midnight.
@@ -362,7 +362,7 @@ export default function AttendanceSummaryView({ data }: { data: SummaryData }) {
               </span>
               <span className="tabular-nums">{liveClock}</span>
             </span>
-            <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold">
+            <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold">
               <Database className="w-3 h-3" aria-hidden="true" />
               <span className="tabular-nums">{data.recordsToday}</span>
             </span>
@@ -407,7 +407,7 @@ export default function AttendanceSummaryView({ data }: { data: SummaryData }) {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search by name, ID, department, or position…"
-                  className="w-full h-10 pl-10 pr-3 rounded-xl border border-slate-200 dark:border-slate-500 bg-slate-50/50 dark:bg-slate-950 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  className="w-full h-10 pl-10 pr-3 rounded-xl border border-slate-200 dark:border-slate-500 bg-slate-50/50 dark:bg-slate-950 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 dark:focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900"
                 />
               </div>
             </div>
@@ -502,7 +502,7 @@ function FilterChip({
   children: React.ReactNode;
 }) {
   return (
-    <label className="inline-flex items-center h-10 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 gap-2 text-sm text-slate-700 dark:text-slate-300 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+    <label className="inline-flex items-center h-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 gap-2 text-sm text-slate-700 dark:text-slate-300 focus-within:border-blue-400 dark:focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 dark:focus-within:ring-blue-900 transition-all">
       {icon}
       <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</span>
       {children}
@@ -511,10 +511,10 @@ function FilterChip({
 }
 
 const ACCENTS = {
-  blue: { bar: "bg-blue-500", glow: "before:bg-blue-500/30", tile: "bg-blue-50 dark:bg-blue-900", icon: "text-blue-600 dark:text-blue-400", ring: "ring-blue-300 border-blue-300", focus: "focus-visible:ring-blue-400", text: "text-blue-600 dark:text-blue-400" },
-  emerald: { bar: "bg-emerald-500", glow: "before:bg-emerald-500/30", tile: "bg-emerald-50 dark:bg-emerald-900", icon: "text-emerald-600 dark:text-emerald-400", ring: "ring-emerald-300 border-emerald-300", focus: "focus-visible:ring-emerald-400", text: "text-emerald-600 dark:text-emerald-400" },
-  amber: { bar: "bg-amber-500", glow: "before:bg-amber-500/30", tile: "bg-amber-50 dark:bg-amber-900", icon: "text-amber-600 dark:text-amber-400", ring: "ring-amber-300 border-amber-300", focus: "focus-visible:ring-amber-400", text: "text-amber-600 dark:text-amber-400" },
-  rose: { bar: "bg-rose-500", glow: "before:bg-rose-500/30", tile: "bg-rose-50 dark:bg-rose-900", icon: "text-rose-600 dark:text-rose-400", ring: "ring-rose-300 border-rose-300", focus: "focus-visible:ring-rose-400", text: "text-rose-600 dark:text-rose-400" },
+  blue: { bar: "bg-blue-500", glow: "before:bg-blue-500/30", tile: "bg-blue-50 dark:bg-blue-900", icon: "text-blue-600", ring: "ring-blue-300 border-blue-300 dark:ring-blue-600 dark:border-blue-600", focus: "focus-visible:ring-blue-400", text: "text-blue-600" },
+  emerald: { bar: "bg-emerald-500", glow: "before:bg-emerald-500/30", tile: "bg-emerald-50 dark:bg-emerald-900", icon: "text-emerald-600", ring: "ring-emerald-300 border-emerald-300 dark:ring-emerald-600 dark:border-emerald-600", focus: "focus-visible:ring-emerald-400", text: "text-emerald-600" },
+  amber: { bar: "bg-amber-500", glow: "before:bg-amber-500/30", tile: "bg-amber-50 dark:bg-amber-900", icon: "text-amber-600", ring: "ring-amber-300 border-amber-300 dark:ring-amber-600 dark:border-amber-600", focus: "focus-visible:ring-amber-400", text: "text-amber-600" },
+  rose: { bar: "bg-rose-500", glow: "before:bg-rose-500/30", tile: "bg-rose-50 dark:bg-rose-900", icon: "text-rose-600", ring: "ring-rose-300 border-rose-300 dark:ring-rose-600 dark:border-rose-600", focus: "focus-visible:ring-rose-400", text: "text-rose-600" },
 } as const;
 
 function StatCard({
@@ -540,7 +540,7 @@ function StatCard({
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
-      className={`relative text-left bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-5 pt-6 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 ${a.focus} ${selected ? `ring-2 shadow-md -translate-y-0.5 ${a.ring}` : ""}`}
+      className={`relative text-left bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-5 pt-6 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${a.focus} ${selected ? `ring-2 shadow-md -translate-y-0.5 ${a.ring}` : ""}`}
     >
       {/* Top accent bar with soft glow */}
       <span className={`absolute top-0 left-0 right-0 h-1 ${a.bar}`} aria-hidden="true" />
@@ -600,7 +600,7 @@ function ScannerStatusChip({ online }: { online: boolean }) {
     );
   }
   return (
-    <span className="inline-flex items-center gap-2 h-10 pl-4 pr-4 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm font-semibold text-slate-500 dark:text-slate-400">
+    <span className="inline-flex items-center gap-2 h-10 pl-4 pr-4 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-sm font-semibold text-slate-500 dark:text-slate-400">
       <RadioReceiver className="w-4 h-4" aria-hidden="true" />
       Scanner Offline
     </span>
@@ -635,7 +635,7 @@ function AttendanceTableRow({
         : "—";
 
   return (
-    <tr className="bg-white dark:bg-slate-900 odd:bg-slate-50/40 dark:odd:bg-slate-800/50 hover:bg-blue-50/40 dark:hover:bg-slate-800 transition-colors border-b border-slate-100 dark:border-slate-800 last:border-b-0">
+    <tr className="bg-white dark:bg-slate-900 odd:bg-slate-50/40 dark:odd:bg-slate-800/50 hover:bg-blue-50/40 dark:hover:bg-blue-900/30 transition-colors border-b border-slate-100 dark:border-slate-800 last:border-b-0">
       <td className="px-4 py-1.5 align-middle">
         <div className="leading-tight">
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -704,7 +704,7 @@ function AttendanceTableRow({
 function TimeCell({ iso, tone }: { iso: string | null; tone: "ok" | "late" }) {
   if (!iso) return <span className="text-slate-300 dark:text-slate-600 font-mono text-xs">—</span>;
   return (
-    <span className={`font-mono text-xs tabular-nums whitespace-nowrap ${tone === "late" ? "text-amber-600 dark:text-amber-400 font-bold" : "text-slate-700 dark:text-slate-300 font-medium"}`}>
+    <span className={`font-mono text-xs tabular-nums whitespace-nowrap ${tone === "late" ? "text-amber-600 font-bold" : "text-slate-700 dark:text-slate-300 font-medium"}`}>
       {TIME_FMT.format(new Date(iso))}
     </span>
   );
@@ -723,7 +723,7 @@ function StatusPill({
     normal:       "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700",
     early:        "bg-amber-50 dark:bg-amber-900 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700",
     currently_in: "bg-emerald-50 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700",
-    muted:        "bg-slate-50 dark:bg-slate-800 text-slate-400 border border-slate-100 dark:border-slate-700",
+    muted:        "bg-slate-50 dark:bg-slate-800 text-slate-400 border border-slate-100 dark:border-slate-800",
   }[variant];
   // Icon vs dot: late + early use an icon (matches the reference), the rest
   // use a small dot so the pill height stays consistent.

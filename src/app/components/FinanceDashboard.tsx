@@ -82,11 +82,11 @@ const TYPE_COLORS: Record<string, string> = {
 // to the nearest --status-violet-* pair (reported: not byte-identical to the
 // original #FAF5FF/#6B21A8, but same hue family).
 const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string; label: string }> = {
-  pending: { bg: "var(--tint-amber)", text: "var(--accent-amber-strong)", dot: "#F59E0B", label: "Pending" },
-  approved: { bg: "var(--tint-green)", text: "var(--accent-green-strong)", dot: "#10B981", label: "Approved" },
-  rejected: { bg: "var(--tint-red)", text: "var(--accent-red-strong)", dot: "#EF4444", label: "Rejected" },
-  disbursed: { bg: "var(--status-violet-bg)", text: "var(--status-violet-fg)", dot: "#A855F7", label: "Disbursed" },
-  received: { bg: "var(--tint-green)", text: "var(--accent-green-strong)", dot: "#10B981", label: "Received" },
+  pending: { bg: "var(--tint-amber)", text: "var(--accent-amber-strong)", dot: "var(--accent-amber)", label: "Pending" },
+  approved: { bg: "var(--tint-green)", text: "var(--accent-green-strong)", dot: "var(--accent-green)", label: "Approved" },
+  rejected: { bg: "var(--tint-red)", text: "var(--accent-red-strong)", dot: "var(--accent-red)", label: "Rejected" },
+  disbursed: { bg: "var(--status-violet-bg)", text: "var(--status-violet-fg)", dot: "var(--accent-violet-strong)", label: "Disbursed" },
+  received: { bg: "var(--tint-green)", text: "var(--accent-green-strong)", dot: "var(--accent-green)", label: "Received" },
 };
 
 const rm = (n: number) =>
@@ -215,7 +215,7 @@ export default function FinanceDashboard({
         <GreetingHeader name={greetName} style={{ padding: "8px 0 4px" }} />
 
         {/* Sub-header */}
-        <div className="border-b border-slate-200 pb-4 dark:border-slate-800">
+        <div className="border-b border-slate-200 dark:border-slate-800 pb-4">
           <p className="text-sm text-slate-500 dark:text-slate-400">
             Overview of all expense claims.
           </p>
@@ -256,8 +256,8 @@ export default function FinanceDashboard({
         {/* Status donut (wide) + pending review (narrow) — swapped */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           {/* Status donut */}
-          <section className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl px-6 py-6 dark:bg-slate-900 dark:border-slate-800">
-            <h2 className="text-xs font-semibold tracking-widest text-slate-500 uppercase mb-5 dark:text-slate-400">
+          <section className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-6">
+            <h2 className="text-xs font-semibold tracking-widest text-slate-500 dark:text-slate-400 uppercase mb-5">
               Claims by Status
             </h2>
             {counts.total > 0 ? (
@@ -272,14 +272,14 @@ export default function FinanceDashboard({
                     return (
                       <li
                         key={s.key}
-                        className="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-800"
+                        className="flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-800 px-4 py-3"
                       >
                         <span
                           className="w-3 h-3 rounded-full shrink-0"
                           style={{ backgroundColor: s.color }}
                           aria-hidden="true"
                         />
-                        <span className="text-sm font-medium text-slate-600 truncate dark:text-slate-300">
+                        <span className="text-sm font-medium text-slate-600 dark:text-slate-300 truncate">
                           {s.label}
                         </span>
                         <span className="ml-auto flex items-baseline gap-1.5 shrink-0">
@@ -297,7 +297,7 @@ export default function FinanceDashboard({
           </section>
 
           {/* Pending review queue */}
-          <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden dark:bg-slate-900 dark:border-slate-800">
+          <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -311,31 +311,31 @@ export default function FinanceDashboard({
                   View all
                 </Link>
               </div>
-              <p className="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
+              <p className="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-400">
                 {counts.pending} pending · {rm(data.pendingAmount)}
               </p>
             </div>
             {data.pending.length === 0 ? (
               <div className="flex flex-col items-center gap-2 text-center py-12">
-                <div className="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center dark:bg-slate-800">
+                <div className="w-11 h-11 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                   <Inbox className="w-5 h-5 text-slate-400" aria-hidden="true" />
                 </div>
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">All caught up</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Nothing waiting for review.</p>
               </div>
             ) : (
-              <ul className="divide-y divide-slate-100 max-h-80 overflow-y-auto dark:divide-slate-800">
+              <ul className="divide-y divide-slate-100 dark:divide-slate-800 max-h-80 overflow-y-auto">
                 {data.pending.map((c) => (
                   <li key={c.claimId}>
                     <Link
                       href={`/claim/${c.claimId}`}
-                      className="group block px-5 py-3 hover:bg-slate-50/70 transition-colors dark:hover:bg-slate-800/70"
+                      className="group block px-5 py-3 hover:bg-slate-50/70 dark:hover:bg-slate-800/70 transition-colors"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-semibold text-slate-800 truncate dark:text-slate-200">
+                        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">
                           {c.employeeName}
                         </span>
-                        <span className="text-sm font-bold text-slate-900 tabular-nums shrink-0 dark:text-slate-100">
+                        <span className="text-sm font-bold text-slate-900 dark:text-slate-100 tabular-nums shrink-0">
                           {rm(c.amount)}
                         </span>
                       </div>
@@ -357,8 +357,8 @@ export default function FinanceDashboard({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           <ToDoList storageKey="finance-dashboard-todos" />
 
-          <section className="bg-white border border-slate-200 rounded-2xl px-6 py-6 dark:bg-slate-900 dark:border-slate-800">
-            <h2 className="text-xs font-semibold tracking-widest text-slate-500 uppercase mb-5 dark:text-slate-400">
+          <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-6">
+            <h2 className="text-xs font-semibold tracking-widest text-slate-500 dark:text-slate-400 uppercase mb-5">
               Approved Amount by Type
             </h2>
             {typeBars.length > 0 ? (
@@ -368,8 +368,8 @@ export default function FinanceDashboard({
             )}
           </section>
 
-          <section className="bg-white border border-slate-200 rounded-2xl px-6 py-6 dark:bg-slate-900 dark:border-slate-800">
-            <h2 className="text-xs font-semibold tracking-widest text-slate-500 uppercase mb-5 dark:text-slate-400">
+          <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-6">
+            <h2 className="text-xs font-semibold tracking-widest text-slate-500 dark:text-slate-400 uppercase mb-5">
               Claims Made by Month
             </h2>
             {monthBars.length > 0 ? (
@@ -384,8 +384,8 @@ export default function FinanceDashboard({
         </div>
 
         {/* Recent claims */}
-        <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden dark:bg-slate-900 dark:border-slate-800">
-          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between dark:border-slate-800">
+        <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-slate-500 dark:text-slate-400" aria-hidden="true" />
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Recent Claims</h2>
@@ -396,7 +396,7 @@ export default function FinanceDashboard({
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-[11px] font-semibold tracking-widest text-slate-500 uppercase dark:bg-slate-800 dark:text-slate-400">
+              <thead className="bg-slate-50 dark:bg-slate-800 text-[11px] font-semibold tracking-widest text-slate-500 dark:text-slate-400 uppercase">
                 <tr>
                   <th className="text-left px-6 py-3">Claim ID</th>
                   <th className="text-left px-6 py-3">Employee</th>
@@ -425,15 +425,15 @@ export default function FinanceDashboard({
                     return (
                       <tr
                         key={c.claimId}
-                        className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors dark:border-slate-800 dark:hover:bg-slate-800/60"
+                        className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-800/60 transition-colors"
                       >
                         <td className="px-6 py-2.5 font-semibold text-blue-600 dark:text-blue-400">{c.displayId}</td>
                         <td className="px-6 py-2.5 text-slate-800 dark:text-slate-200">{c.employeeName}</td>
                         <td className="px-6 py-2.5 text-slate-700 dark:text-slate-300">{typeLabel(c.claimType)}</td>
-                        <td className="px-6 py-2.5 font-semibold text-slate-900 tabular-nums dark:text-slate-100">
+                        <td className="px-6 py-2.5 font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
                           {rm(c.amount)}
                         </td>
-                        <td className="px-6 py-2.5 text-slate-600 tabular-nums dark:text-slate-300">
+                        <td className="px-6 py-2.5 text-slate-600 dark:text-slate-300 tabular-nums">
                           {new Date(c.claimDate).toLocaleDateString("en-GB")}
                         </td>
                         <td className="px-6 py-2.5">
@@ -453,7 +453,7 @@ export default function FinanceDashboard({
                           <Link
                             href={`/claim/${c.claimId}`}
                             aria-label={`View ${c.displayId}`}
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
                           >
                             <Eye className="w-4 h-4" aria-hidden="true" />
                           </Link>
@@ -469,9 +469,9 @@ export default function FinanceDashboard({
 
         {/* Headcount */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          <section className="bg-white border border-slate-200 rounded-2xl px-6 py-6 dark:bg-slate-900 dark:border-slate-800">
+          <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-xs font-semibold tracking-widest text-slate-500 uppercase dark:text-slate-400">
+              <h2 className="text-xs font-semibold tracking-widest text-slate-500 dark:text-slate-400 uppercase">
                 Headcount by Department
               </h2>
               <span className="text-xs font-semibold text-slate-400 tabular-nums">
@@ -485,9 +485,9 @@ export default function FinanceDashboard({
             )}
           </section>
 
-          <section className="bg-white border border-slate-200 rounded-2xl px-6 py-6 dark:bg-slate-900 dark:border-slate-800">
+          <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-xs font-semibold tracking-widest text-slate-500 uppercase dark:text-slate-400">
+              <h2 className="text-xs font-semibold tracking-widest text-slate-500 dark:text-slate-400 uppercase">
                 Headcount by Branch
               </h2>
               <span className="text-xs font-semibold text-slate-400 tabular-nums">

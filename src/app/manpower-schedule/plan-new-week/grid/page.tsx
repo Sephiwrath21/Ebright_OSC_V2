@@ -311,13 +311,13 @@ function SummaryTable({
                     <span className={`text-base font-black ${noSchedule ? "text-slate-300 dark:text-slate-600" : "text-slate-700 dark:text-slate-300"}`}>{row.classes}</span>
                   </td>
                   {[c, e, t].map((time, j) => (
-                    <td key={j} className={`border border-slate-300 dark:border-slate-700 px-2 py-3 ${j === 2 ? "bg-blue-50/50 dark:bg-blue-900/30" : ""}`}>
+                    <td key={j} className={`border border-slate-300 dark:border-slate-700 px-2 py-3 ${j === 2 ? "bg-blue-50/50 dark:bg-blue-900/40" : ""}`}>
                       <div className="flex flex-row gap-4 items-center justify-center">
-                        <div className="flex items-baseline gap-1 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 px-2 py-1 rounded">
+                        <div className="flex items-baseline gap-1 bg-white border border-slate-200 px-2 py-1 rounded dark:bg-slate-950 dark:border-slate-700">
                           <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{time.h}</span>
                           <span className="text-[9px] uppercase font-black text-slate-400">hrs</span>
                         </div>
-                        <div className="flex items-baseline gap-1 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 px-2 py-1 rounded">
+                        <div className="flex items-baseline gap-1 bg-white border border-slate-200 px-2 py-1 rounded dark:bg-slate-950 dark:border-slate-700">
                           <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{time.m}</span>
                           <span className="text-[9px] uppercase font-black text-slate-400">min</span>
                         </div>
@@ -585,13 +585,13 @@ function DayScheduleTable({
   return (
     <div className="overflow-x-auto relative">
       <table className="w-full border-collapse" style={{ minWidth: `${470 + (coachCount + execCount) * 115}px` }}>
-        <thead className="bg-slate-50/50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 text-[10px] uppercase tracking-widest text-slate-700 dark:text-slate-300 font-bold">
+        <thead className="bg-slate-50/50 border-b border-slate-200 text-[10px] uppercase tracking-widest text-slate-700 font-bold dark:bg-slate-800/50 dark:border-slate-700 dark:text-slate-300">
           <tr>
-            <th className="p-3 text-left w-[160px] sticky left-0 z-20 bg-slate-50 dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-semibold shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)] whitespace-nowrap">
+            <th className="p-3 text-left w-[160px] sticky left-0 z-20 bg-slate-50 border-r border-slate-200 text-slate-600 font-semibold shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] whitespace-nowrap dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300">
               Time Slot
             </th>
             {/* Manager column header */}
-            <th className="p-3 text-center border-l border-slate-200 dark:border-slate-700 w-[130px] bg-emerald-50/40 dark:bg-emerald-900/30 border-b-4 border-b-emerald-400">
+            <th className="p-3 text-center border-l border-slate-200 w-[130px] bg-emerald-50/40 border-b-4 border-b-emerald-400 dark:bg-emerald-900/40 dark:border-slate-700">
               <div className="flex flex-col items-center gap-1.5">
                 <span className="text-[10px] font-extrabold text-slate-800 dark:text-slate-200">MANAGER</span>
                 {showColumnControls && editable ? (
@@ -601,7 +601,7 @@ function DayScheduleTable({
                       onChange={e =>
                         setManagerReplacementBranch?.(p => ({ ...p, [day]: e.target.value }))
                       }
-                      className="text-[9px] bg-emerald-50 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-700 rounded-full px-2 py-0.5 font-bold appearance-none text-center cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-800 transition-colors outline-none"
+                      className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5 font-bold appearance-none text-center cursor-pointer hover:bg-emerald-100 transition-colors outline-none dark:bg-emerald-900 dark:text-emerald-300 dark:border-emerald-700 dark:hover:bg-emerald-800"
                     >
                       <option value="">Own Branch</option>
                       {ALL_BRANCHES.filter(b => b !== branch).map(b => (
@@ -611,7 +611,7 @@ function DayScheduleTable({
                     {managerReplacementBranch[day] && (
                       <button
                         onClick={() => setManagerReplacementBranch?.(p => ({ ...p, [day]: "" }))}
-                        className="text-[10px] text-red-500 dark:text-red-400 font-black hover:text-red-700 dark:hover:text-red-300 transition-colors"
+                        className="text-[10px] text-red-500 font-black hover:text-red-700 transition-colors dark:text-red-400 dark:hover:text-red-300"
                         title="Clear replacement branch"
                       >
                         ✕
@@ -622,14 +622,14 @@ function DayScheduleTable({
                 {showColumnControls && editable && (
                   <button
                     onClick={() => onClearColumn?.("MANAGER")}
-                    className="text-[9px] text-red-500 dark:text-red-400 font-extrabold uppercase tracking-wider hover:underline cursor-pointer"
+                    className="text-[9px] text-red-500 font-extrabold uppercase tracking-wider hover:underline cursor-pointer dark:text-red-400"
                     title="Clear this column for the whole day"
                   >
                     Clear
                   </button>
                 )}
                 {(!editable || !showColumnControls) && (
-                  <span className="text-[9px] bg-emerald-50 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-700 rounded-full px-2 py-0.5 font-bold">
+                  <span className="text-[9px] bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full px-2 py-0.5 font-bold dark:bg-emerald-900 dark:text-emerald-300 dark:border-emerald-700">
                     {managerReplacementBranch[day] || "Own Branch"}
                   </span>
                 )}
@@ -650,20 +650,20 @@ function DayScheduleTable({
               let textBadge = "text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-900 border-blue-100 dark:border-blue-700";
 
               if (isExec) {
-                colBg = "bg-purple-50/40 dark:bg-purple-900/30 border-b-purple-400";
-                labelColor = "text-purple-800 dark:text-purple-300";
-                badgeClass = "bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-700 hover:bg-purple-100 dark:hover:bg-purple-800";
-                textBadge = "text-purple-600 dark:text-purple-300 bg-purple-50 dark:bg-purple-900 border-purple-100 dark:border-purple-700";
+                colBg = "bg-purple-50/40 border-b-purple-400 dark:bg-purple-900/40";
+                labelColor = "text-purple-800 dark:text-purple-200";
+                badgeClass = "bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 dark:bg-purple-900 dark:text-purple-300 dark:border-purple-700 dark:hover:bg-purple-800";
+                textBadge = "text-purple-600 bg-purple-50 border-purple-100 dark:text-purple-300 dark:bg-purple-900 dark:border-purple-700";
               } else if (isTraining) {
-                colBg = "bg-amber-50/40 dark:bg-amber-900/30 border-b-amber-400";
-                labelColor = "text-amber-800 dark:text-amber-300";
-                badgeClass = "bg-amber-50 dark:bg-amber-900 text-amber-700 dark:text-amber-200 border border-amber-200 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-800";
-                textBadge = "text-amber-600 dark:text-amber-300 bg-amber-50 dark:bg-amber-900 border-amber-100 dark:border-amber-700";
+                colBg = "bg-amber-50/40 border-b-amber-400 dark:bg-amber-900/40";
+                labelColor = "text-amber-800 dark:text-amber-200";
+                badgeClass = "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 dark:bg-amber-900 dark:text-amber-300 dark:border-amber-700 dark:hover:bg-amber-800";
+                textBadge = "text-amber-600 bg-amber-50 border-amber-100 dark:text-amber-300 dark:bg-amber-900 dark:border-amber-700";
               } else if (isStar) {
-                colBg = "bg-rose-50/40 dark:bg-rose-900/30 border-b-rose-400";
-                labelColor = "text-rose-800 dark:text-rose-300";
-                badgeClass = "bg-rose-50 dark:bg-rose-900 text-rose-700 dark:text-rose-200 border border-rose-200 dark:border-rose-700 hover:bg-rose-100 dark:hover:bg-rose-800";
-                textBadge = "text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-900 border-rose-100 dark:border-rose-700";
+                colBg = "bg-rose-50/40 border-b-rose-400 dark:bg-rose-900/40";
+                labelColor = "text-rose-800 dark:text-rose-200";
+                badgeClass = "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 dark:bg-rose-900 dark:text-rose-300 dark:border-rose-700 dark:hover:bg-rose-800";
+                textBadge = "text-rose-600 bg-rose-50 border-rose-100 dark:text-rose-300 dark:bg-rose-900 dark:border-rose-700";
               }
 
               return (
@@ -699,7 +699,7 @@ function DayScheduleTable({
                                 return next;
                               })
                             }
-                            className="text-[10px] text-red-500 dark:text-red-400 font-black hover:text-red-700 dark:hover:text-red-300 transition-colors"
+                            className="text-[10px] text-red-500 font-black hover:text-red-700 transition-colors dark:text-red-400 dark:hover:text-red-300"
                             title="Clear replacement branch"
                           >
                             ✕
@@ -714,7 +714,7 @@ function DayScheduleTable({
                     {showColumnControls && editable && (
                       <button
                         onClick={() => onClearColumn?.(col.id)}
-                        className="text-[9px] text-red-500 dark:text-red-400 font-extrabold uppercase tracking-wider hover:underline cursor-pointer"
+                        className="text-[9px] text-red-500 font-extrabold uppercase tracking-wider hover:underline cursor-pointer dark:text-red-400"
                         title="Clear this column for the whole day"
                       >
                         Clear
@@ -742,19 +742,19 @@ function DayScheduleTable({
             return (
               <tr
                 key={slotLabel}
-                className={`border-b dark:border-slate-700 transition-colors group ${
+                className={`border-b transition-colors group ${
                   isOpenClose ? "bg-indigo-50/30 dark:bg-indigo-900/30" : "hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
                 }`}
               >
                 <td
-                  className={`p-3 font-bold border-r border-slate-200 dark:border-slate-700 text-xs sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)] transition-colors text-slate-900 dark:text-slate-100 w-[160px] min-w-[160px] whitespace-nowrap ${
+                  className={`p-3 font-bold border-r border-slate-200 text-xs sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] transition-colors text-slate-900 w-[160px] min-w-[160px] whitespace-nowrap dark:border-slate-700 dark:text-slate-100 ${
                     isOpenClose
-                      ? "bg-indigo-100/50 dark:bg-indigo-900/40 group-hover:bg-indigo-100/50 dark:group-hover:bg-indigo-900/40"
-                      : "bg-slate-50 dark:bg-slate-800 group-hover:bg-slate-100 dark:group-hover:bg-slate-700"
+                      ? "bg-indigo-100/50 group-hover:bg-indigo-100/50 dark:bg-indigo-900/50 dark:group-hover:bg-indigo-900/50"
+                      : "bg-slate-50 group-hover:bg-slate-100 dark:bg-slate-900 dark:group-hover:bg-slate-800"
                   }`}
                 >
                   <div className="flex flex-col">
-                    <span className="font-bold text-[11px] text-slate-800 dark:text-slate-200 whitespace-nowrap">{slotLabel}</span>
+                    <span className="font-bold text-[11px] text-slate-800 whitespace-nowrap dark:text-slate-200">{slotLabel}</span>
                     {!isOpenClose && (
                       <span className="text-[9px] font-medium text-slate-400 mt-0.5 whitespace-nowrap">{getDurationLabel(slotLabel)}</span>
                     )}
@@ -762,7 +762,7 @@ function DayScheduleTable({
                 </td>
 
                 {!isOpenClose && (
-                  <td className="p-1.5 border-l border-slate-200 dark:border-slate-700 align-middle bg-emerald-50/10 dark:bg-emerald-900/10 w-[130px]">
+                  <td className="p-1.5 border-l border-slate-200 align-middle bg-emerald-50/10 w-[130px] dark:border-slate-700 dark:bg-emerald-900/10">
                     {showManager ? (() => {
                       // Manager cell uses BMs from the replacement branch
                       // when one is set on this day, otherwise own branch.
@@ -777,9 +777,9 @@ function DayScheduleTable({
                           className={`w-full py-1.5 px-3 rounded-xl font-bold text-[11px] appearance-none transition-all outline-none text-center ${
                             managerVal
                               ? checkIfLeavingSoon(managerVal)
-                                ? "bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200 border border-red-200 dark:border-red-700"
+                                ? "bg-red-50 text-red-700 border border-red-200 dark:bg-red-900 dark:text-red-300 dark:border-red-700"
                                 : colorFor(managerVal)
-                              : "bg-emerald-50/40 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-700 hover:bg-emerald-50/80 dark:hover:bg-emerald-900/50"
+                              : "bg-emerald-50/40 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-50/80 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-700/60 dark:hover:bg-emerald-900/60"
                           }`}
                           style={{
                             backgroundImage: editable ? `url("${SELECT_ARROW_DARK}")` : "none",
@@ -813,8 +813,8 @@ function DayScheduleTable({
                         </select>
                       );
                     })() : (
-                      <div className="w-full h-[28px] rounded-xl bg-emerald-50/30 dark:bg-emerald-900/20 border border-dashed border-emerald-100 dark:border-emerald-800 flex items-center justify-center">
-                        <span className="text-[9px] text-emerald-300 dark:text-emerald-600 font-bold uppercase tracking-wider">—</span>
+                      <div className="w-full h-[28px] rounded-xl bg-emerald-50/30 border border-dashed border-emerald-100 flex items-center justify-center dark:bg-emerald-900/30 dark:border-emerald-800">
+                        <span className="text-[9px] text-emerald-300 font-bold uppercase tracking-wider dark:text-emerald-700">—</span>
                       </div>
                     )}
                   </td>
@@ -843,15 +843,15 @@ function DayScheduleTable({
 
                       const selectTheme = val
                         ? checkIfLeavingSoon(val)
-                          ? "bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200 border border-red-200 dark:border-red-700"
+                          ? "bg-red-50 text-red-700 border border-red-200 dark:bg-red-900 dark:text-red-300 dark:border-red-700"
                           : colorFor(val)
                         : isExec
-                          ? "bg-purple-50/40 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 border border-purple-200/60 dark:border-purple-700 hover:bg-purple-50/80 dark:hover:bg-purple-900/50"
+                          ? "bg-purple-50/40 text-purple-600 border border-purple-200/60 hover:bg-purple-50/80 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-700/60 dark:hover:bg-purple-900/60"
                           : isTraining
-                            ? "bg-amber-50/40 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300 border border-amber-200/60 dark:border-amber-700 hover:bg-amber-50/80 dark:hover:bg-amber-900/50"
+                            ? "bg-amber-50/40 text-amber-600 border border-amber-200/60 hover:bg-amber-50/80 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700/60 dark:hover:bg-amber-900/60"
                             : isStar
-                              ? "bg-rose-50/40 dark:bg-rose-900/30 text-rose-600 dark:text-rose-300 border border-rose-200/60 dark:border-rose-700 hover:bg-rose-50/80 dark:hover:bg-rose-900/50"
-                              : "bg-blue-50/40 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 border border-blue-200/60 dark:border-blue-700 hover:bg-blue-50/80 dark:hover:bg-blue-900/50";
+                              ? "bg-rose-50/40 text-rose-600 border border-rose-200/60 hover:bg-rose-50/80 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-700/60 dark:hover:bg-rose-900/60"
+                              : "bg-blue-50/40 text-blue-600 border border-blue-200/60 hover:bg-blue-50/80 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-700/60 dark:hover:bg-blue-900/60";
 
                       // Coach/Exec cell uses PT/FT coaches from the
                       // replacement branch when one is set for this
@@ -1945,7 +1945,7 @@ function PlanNewWeekGridContent({ userRole }: { userRole: string }) {
 
         {/* ─── Main content area ──────────────────────────────────────────────── */}
         {loading ? (
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-2 py-24 px-6 text-center">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 flex flex-col items-center justify-center gap-2 py-24 px-6 text-center dark:bg-slate-900 dark:border-slate-800">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
               Loading schedule…
             </span>
@@ -1959,7 +1959,7 @@ function PlanNewWeekGridContent({ userRole }: { userRole: string }) {
             <div className="sticky top-0 z-30 -mx-4 sm:-mx-6 lg:-mx-8 bg-white dark:bg-slate-900 border-b-2 border-slate-200 dark:border-slate-800 shadow-sm">
               <div className="px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center relative gap-4 flex-wrap md:flex-nowrap">
                 {/* Day tabs */}
-                <div className="flex gap-1 bg-slate-100/80 dark:bg-slate-800/80 p-1 rounded-xl select-none z-10">
+                <div className="flex gap-1 bg-slate-100/80 p-1 rounded-xl select-none z-10 dark:bg-slate-800/80">
                   {workingDays.map(d => {
                     const active = selectedDay === d;
                     return (
@@ -1968,8 +1968,8 @@ function PlanNewWeekGridContent({ userRole }: { userRole: string }) {
                         onClick={() => setSelectedDay(d)}
                         className={`px-3.5 py-1.5 rounded-lg font-bold text-xs transition-all ${
                           active
-                            ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs"
-                            : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                            ? "bg-white text-indigo-600 shadow-xs dark:bg-slate-900 dark:text-indigo-400"
+                            : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
                         }`}
                       >
                         {d.slice(0, 3).toUpperCase()}
@@ -1980,7 +1980,7 @@ function PlanNewWeekGridContent({ userRole }: { userRole: string }) {
 
                 {/* Day title centered */}
                 <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none hidden md:flex">
-                  <h2 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 m-0 leading-none tracking-tight">
+                  <h2 className="text-sm font-extrabold text-slate-800 m-0 leading-none tracking-tight dark:text-slate-200">
                     {day}
                   </h2>
                   <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mt-0.5">
@@ -2059,7 +2059,7 @@ function PlanNewWeekGridContent({ userRole }: { userRole: string }) {
                 The slate-600/700 header bar below is a fixed dark chrome strip (like
                 the navy Actual bar) — intentionally dark in both themes, left as-is. */}
             <div className="mt-5 rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-800">
-              {/* Planning section header */}
+              {/* Planning section header — intentionally a fixed dark bar in both themes */}
               <div className="bg-slate-600 px-5 py-3 flex items-center gap-3">
                 <span className="text-slate-300 font-black uppercase tracking-widest text-xs">Planning</span>
                 <span className="text-[10px] font-bold text-slate-400 bg-slate-700 border border-slate-500 px-2.5 py-0.5 rounded-full">
@@ -2183,7 +2183,7 @@ function PlanNewWeekGridContent({ userRole }: { userRole: string }) {
                   </span>
                   <Link
                     href="/manpower-schedule/settings"
-                    className="mt-2 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700 bg-indigo-50/50 dark:bg-indigo-900/40 hover:bg-indigo-50 dark:hover:bg-indigo-900/70 px-4 py-2 rounded-xl font-bold text-xs transition-colors"
+                    className="mt-2 text-indigo-600 border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 px-4 py-2 rounded-xl font-bold text-xs transition-colors dark:text-indigo-400 dark:border-indigo-700 dark:bg-indigo-900/50 dark:hover:bg-indigo-900"
                   >
                     Go to Settings
                   </Link>
@@ -2248,7 +2248,7 @@ function PlanNewWeekGridContent({ userRole }: { userRole: string }) {
           </div>
         ) : (
           /* ── CREATE / VIEW MODE: Single table ── */
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-800">
+          <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
             {loading ? (
               <div className="flex flex-col items-center justify-center gap-2 py-24 px-6 text-center">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
@@ -2257,9 +2257,9 @@ function PlanNewWeekGridContent({ userRole }: { userRole: string }) {
               </div>
             ) : (
               <>
-                <header className="bg-white dark:bg-slate-900 p-4 border-b dark:border-slate-800 flex justify-between items-center relative gap-4 flex-wrap md:flex-nowrap">
+                <header className="bg-white p-4 border-b flex justify-between items-center relative gap-4 flex-wrap md:flex-nowrap dark:bg-slate-900 dark:border-slate-800">
                   {/* Day tabs */}
-                  <div className="flex gap-1 bg-slate-100/80 dark:bg-slate-800/80 p-1 rounded-xl select-none z-10">
+                  <div className="flex gap-1 bg-slate-100/80 p-1 rounded-xl select-none z-10 dark:bg-slate-800/80">
                     {workingDays.map(d => {
                       const active = selectedDay === d;
                       return (
@@ -2268,8 +2268,8 @@ function PlanNewWeekGridContent({ userRole }: { userRole: string }) {
                           onClick={() => setSelectedDay(d)}
                           className={`px-3.5 py-1.5 rounded-lg font-bold text-xs transition-all ${
                             active
-                              ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs"
-                              : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                              ? "bg-white text-indigo-600 shadow-xs dark:bg-slate-900 dark:text-indigo-400"
+                              : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
                           }`}
                         >
                           {d.slice(0, 3).toUpperCase()}
@@ -2280,7 +2280,7 @@ function PlanNewWeekGridContent({ userRole }: { userRole: string }) {
 
                   {/* Day title centered */}
                   <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none hidden md:flex">
-                    <h2 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 m-0 leading-none tracking-tight">
+                    <h2 className="text-sm font-extrabold text-slate-800 m-0 leading-none tracking-tight dark:text-slate-200">
                       {day}
                     </h2>
                     <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mt-0.5">
@@ -2347,7 +2347,7 @@ function PlanNewWeekGridContent({ userRole }: { userRole: string }) {
                     {isEditing && (
                       <button
                         onClick={() => clearAllForDay(day)}
-                        className="text-red-500 dark:text-red-400 font-extrabold uppercase text-[10px] hover:underline px-2 py-1"
+                        className="text-red-500 font-extrabold uppercase text-[10px] hover:underline px-2 py-1 dark:text-red-400"
                       >
                         Clear All
                       </button>
@@ -2368,7 +2368,7 @@ function PlanNewWeekGridContent({ userRole }: { userRole: string }) {
                     </span>
                     <Link
                       href="/manpower-schedule/settings"
-                      className="mt-2 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700 bg-indigo-50/50 dark:bg-indigo-900/40 hover:bg-indigo-50 dark:hover:bg-indigo-900/70 px-4 py-2 rounded-xl font-bold text-xs transition-colors"
+                      className="mt-2 text-indigo-600 border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 px-4 py-2 rounded-xl font-bold text-xs transition-colors dark:text-indigo-400 dark:border-indigo-700 dark:bg-indigo-900/50 dark:hover:bg-indigo-900"
                     >
                       Go to Settings
                     </Link>
@@ -2434,7 +2434,7 @@ function PlanNewWeekGridContent({ userRole }: { userRole: string }) {
         )}
 
         {isReadOnly && (
-          <div className="mt-12 mx-auto max-w-md text-center bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-6 py-4 rounded-xl">
+          <div className="mt-12 mx-auto max-w-md text-center bg-slate-100 border border-slate-200 px-6 py-4 rounded-xl dark:bg-slate-800 dark:border-slate-700">
             <span className="font-semibold text-slate-500 dark:text-slate-400 text-sm">
               Read-only view
             </span>
@@ -2442,7 +2442,7 @@ function PlanNewWeekGridContent({ userRole }: { userRole: string }) {
         )}
 
         {loading && (
-          <div className="fixed bottom-6 right-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg rounded-xl px-4 py-2 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+          <div className="fixed bottom-6 right-6 bg-white border border-slate-200 shadow-lg rounded-xl px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-widest dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400">
             Loading...
           </div>
         )}
@@ -2451,11 +2451,11 @@ function PlanNewWeekGridContent({ userRole }: { userRole: string }) {
       {/* Add Employee modal (visual only) */}
       {showAddEmployeeModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] shadow-2xl border border-slate-100 dark:border-slate-800 w-full max-w-sm flex flex-col gap-5">
-            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-200 text-center">
+          <div className="bg-white p-8 rounded-[2rem] shadow-2xl border border-slate-100 w-full max-w-sm flex flex-col gap-5 dark:bg-slate-900 dark:border-slate-800">
+            <h2 className="text-lg font-bold text-slate-800 text-center dark:text-slate-200">
               Add Employee
             </h2>
-            <div className="text-xs text-slate-500 dark:text-slate-400 text-center font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2">
+            <div className="text-xs text-slate-500 text-center font-medium bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-400">
               Branch: <span className="font-semibold text-slate-700 dark:text-slate-300">{branch}</span>
             </div>
             <div className="flex flex-col gap-2">
@@ -2465,7 +2465,7 @@ function PlanNewWeekGridContent({ userRole }: { userRole: string }) {
                 value={newEmployeeName}
                 onChange={e => setNewEmployeeName(e.target.value)}
                 placeholder="e.g. Ahmad Bin Ali"
-                className="w-full p-3 border-2 border-slate-200 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-950 font-bold text-slate-700 dark:text-slate-100 outline-none focus:border-green-500 transition-colors"
+                className="w-full p-3 border-2 border-slate-200 rounded-xl bg-slate-50 font-bold text-slate-700 outline-none focus:border-green-500 transition-colors dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
                 autoFocus
               />
             </div>
@@ -2474,7 +2474,7 @@ function PlanNewWeekGridContent({ userRole }: { userRole: string }) {
               <select
                 value={newEmployeePosition}
                 onChange={e => setNewEmployeePosition(e.target.value)}
-                className="w-full p-3 border-2 border-slate-200 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-950 font-bold text-slate-700 dark:text-slate-100 outline-none focus:border-green-500 transition-colors"
+                className="w-full p-3 border-2 border-slate-200 rounded-xl bg-slate-50 font-bold text-slate-700 outline-none focus:border-green-500 transition-colors dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
               >
                 <option value="Part Time">Part Time</option>
                 <option value="Full Time">Full Time</option>
@@ -2484,7 +2484,7 @@ function PlanNewWeekGridContent({ userRole }: { userRole: string }) {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowAddEmployeeModal(false)}
-                className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 text-sm transition-colors"
+                className="flex-1 py-2.5 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 text-sm transition-colors dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
               >
                 Cancel
               </button>

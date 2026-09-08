@@ -1,5 +1,12 @@
 import nodemailer, { type SendMailOptions, type SentMessageInfo } from 'nodemailer';
 
+/**
+ * SMTP transport, ported from the V1 portal (D:GamesEbrigth_OSC lib/mailer.ts)
+ * so both apps send through the same authenticated, pooled, cooldown-protected
+ * path. V1's app-specific senders (clock-in/out, missing-reminder, FA alerts)
+ * are deliberately not carried over — V2 has no callers for them.
+ */
+
 // SMTP_PASS is the canonical name; SMTP_PASSWORD is accepted because some
 // environments were configured with that spelling and the mismatch fails
 // silently (undefined pass → "Invalid login", which looks like a bad
@@ -18,8 +25,7 @@ const SMTP_SECURE = process.env.SMTP_SECURE
 
 // Gmail throttles when the same account performs many fresh logins in a short
 // window ("454-4.7.0 Too many login attempts"). Pooling reuses a single
-// authenticated connection across all sends, and the rate limiter prevents
-// burst sends during scanner-sync retry catch-up loops.
+// authenticated connection across all sends.
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: SMTP_PORT,
@@ -29,25 +35,25 @@ const transporter = nodemailer.createTransport({
   maxMessages: 100,        // re-auth after 100 messages (well under Gmail's daily cap)
   rateDelta: 1000,         // window for rateLimit, in ms
   rateLimit: 3,            // max 3 messages per second — safe for Gmail
-  // Fast timeouts: a single bad email must not block the scanner-sync loop
-  // for 30+ seconds. With these, a connection failure surfaces in <=5s and
-  // immediately trips the cooldown (see safeSend below) so subsequent retries
-  // bail instantly instead of each waiting for their own timeout.
+  // Fast timeouts: a single bad email must not block a request for 30+ seconds.
+  // With these, a connection failure surfaces in <=5s and immediately trips the
+  // cooldown (see safeSend below) so subsequent retries bail instantly instead
+  // of each waiting for their own timeout.
   connectionTimeout: 5_000,  // TCP connect must complete within 5s
   greetingTimeout:   5_000,  // SMTP greeting must arrive within 5s
   socketTimeout:    10_000,  // overall send must complete within 10s
   auth: {
     user: process.env.SMTP_USER,
-    pass: SMTP_PASSWORD,
+    // Gmail App Passwords are displayed in 4 groups of 4; the spaces are
+    // cosmetic and must be stripped or the AUTH string is wrong.
+    pass: SMTP_PASSWORD?.replaceAll(" ", ""),
   },
 });
 
 // ─── Cooldown circuit breaker ────────────────────────────────────────────────
 // Once any send returns a Gmail rate-limit / auth failure, ALL further sends
-// bail instantly for COOLDOWN_MS without touching Gmail. This stops the
-// scanner-sync retry loop from re-hammering the account every 10s, which is
-// what keeps the lockout going. Caller treats a cooldown skip as a failure
-// (clockInEmailSent stays false), so the email naturally retries after cooldown.
+// bail instantly for COOLDOWN_MS without touching Gmail. This stops a retry
+// loop from re-hammering the account, which is what keeps a lockout going.
 const COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
 // A 454 ("Too many login attempts") needs a far longer back-off than a
 // one-off failure, because Google's counter only decays while nothing is
@@ -119,7 +125,7 @@ async function safeSend(msg: SendMailOptions): Promise<SentMessageInfo> {
 }
 
 // One-time SMTP auth check in production so the cause of any failure is obvious.
-if (process.env.NODE_ENV === "production") {
+if (process.env.NODE_ENV === "production" && process.env.SMTP_HOST) {
   transporter.verify().then(
     () => console.log(`[mailer] ✓ SMTP authenticated as ${process.env.SMTP_USER}`),
     (err: Error) => {
@@ -130,6 +136,17 @@ if (process.env.NODE_ENV === "production") {
         console.error(`[mailer] ❄ Entering ${wait / 60000}min cooldown — no sends will be attempted`);
       }
     },
+  );
+} else if (process.env.NODE_ENV === "production") {
+  // No SMTP_HOST in production is a misconfigured host, not a design choice:
+  // .env is git-ignored and never travels with a deploy, so a server that was
+  // never configured by hand silently has no mail at all. Say so when the module
+  // loads rather than leaving the first user to discover it as "Failed to send
+  // reset link. Please contact support."
+  console.error(
+    "[mailer] SMTP_HOST is not set — SMTP delivery is disabled on this host. " +
+    "Password reset falls back to Resend if CRM_RESEND_API_KEY / RESEND_API_KEY " +
+    "is set, and fails outright otherwise. See .env.example.",
   );
 }
 

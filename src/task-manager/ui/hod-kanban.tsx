@@ -147,7 +147,7 @@ function ColumnColorPicker({
               onPick(null);
               setOpen(false);
             }}
-            className="flex size-5 items-center justify-center rounded-full border border-dashed border-gray-300 text-[10px] text-gray-400 hover:border-gray-400 dark:border-slate-600 dark:hover:border-slate-500"
+            className="flex size-5 items-center justify-center rounded-full border border-dashed border-gray-300 text-[10px] text-gray-400 hover:border-gray-400 dark:border-slate-600 dark:text-slate-400 dark:hover:border-slate-500"
           >
             ×
           </button>
@@ -162,7 +162,7 @@ function ColumnColorPicker({
                 setOpen(false);
               }}
               className={`size-5 rounded-full ${COLUMN_SWATCH_DOT[c]} ${
-                color === c ? "ring-2 ring-offset-1 ring-gray-400 dark:ring-offset-slate-900" : ""
+                color === c ? "ring-2 ring-offset-1 ring-gray-400 dark:ring-slate-500 dark:ring-offset-slate-900" : ""
               }`}
             />
           ))}
@@ -330,7 +330,7 @@ const KanbanColumnView = React.memo(function KanbanColumnView({
               }
             }}
             onBlur={submitRename}
-            className="min-w-0 flex-1 rounded border border-blue-300 bg-white px-1 py-0.5 text-sm font-semibold text-gray-700 focus:outline-none dark:border-blue-600 dark:bg-slate-950 dark:text-slate-100"
+            className="min-w-0 flex-1 rounded border border-blue-300 bg-white px-1 py-0.5 text-sm font-semibold text-gray-700 focus:outline-none dark:border-blue-500 dark:bg-slate-950 dark:text-slate-100"
           />
         ) : (
           <h4
@@ -370,7 +370,7 @@ const KanbanColumnView = React.memo(function KanbanColumnView({
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && submit()}
           placeholder="+ Add a card"
-          className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+          className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-400"
         />
       </div>
     </div>
@@ -397,7 +397,7 @@ function AddColumnControl({ onAdd }: { onAdd: (label: string) => void }) {
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="flex min-h-[60px] min-w-40 items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-gray-200 p-3 text-sm text-gray-400 hover:border-gray-300 hover:text-gray-600 sm:self-start dark:border-slate-700 dark:hover:border-slate-600 dark:hover:text-slate-300"
+        className="flex min-h-[60px] min-w-40 items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-gray-200 p-3 text-sm text-gray-400 hover:border-gray-300 hover:text-gray-600 sm:self-start dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-300"
       >
         + Add column
       </button>
@@ -417,7 +417,7 @@ function AddColumnControl({ onAdd }: { onAdd: (label: string) => void }) {
           }
         }}
         placeholder="Column name"
-        className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+        className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-400"
       />
       <div className="flex gap-1.5">
         <button
@@ -655,7 +655,7 @@ export function HodKanban({
               type="button"
               onClick={() => setBoardError(null)}
               aria-label="Dismiss"
-              className="text-red-400 hover:text-red-600 dark:hover:text-red-300"
+              className="text-red-400 hover:text-red-600 dark:text-red-300 dark:hover:text-red-200"
             >
               ×
             </button>

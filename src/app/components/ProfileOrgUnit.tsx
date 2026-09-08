@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Building2, ChevronRight, CircleCheck, CircleAlert } from "lucide-react";
 import { updateOrgUnit, type UpdateOrgUnitResult } from "@/app/profile/actions";
 
@@ -26,6 +26,11 @@ export default function ProfileOrgUnit({
   // group is labelled to say. listBranches() itself is untouched, since
   // Transfer's dropdown and the Add-employee form still need HQ in.
   const realBranches = branches.filter((b) => b.code !== "HQ");
+
+  // Picking a department saves HQ as the branch (see updateOrgUnit); say so
+  // instead of leaving the implied half of the choice invisible.
+  const [orgUnit, setOrgUnit] = useState(defaultOrgUnit);
+  const impliesHq = !onlyBranches && orgUnit.startsWith("dept:");
 
   return (
     <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -65,7 +70,8 @@ export default function ProfileOrgUnit({
           <div className="relative">
             <select
               name="orgUnit"
-              defaultValue={defaultOrgUnit}
+              value={orgUnit}
+              onChange={(e) => setOrgUnit(e.target.value)}
               required
               className="block w-full h-10 px-3 pr-8 rounded-lg border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-950 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer"
             >
@@ -91,6 +97,11 @@ export default function ProfileOrgUnit({
             </select>
             <ChevronRight className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 rotate-90" aria-hidden="true" />
           </div>
+          {impliesHq && (
+            <span className="mt-1.5 block text-xs text-slate-500 dark:text-slate-400">
+              Branch will be set to HQ automatically — departments sit under HQ.
+            </span>
+          )}
         </label>
 
         <div className="flex justify-end">

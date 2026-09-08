@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import AppShell from "@/app/components/AppShell";
 import NewClaimView from "@/app/components/NewClaimView";
 import { prisma } from "@/lib/prisma";
+import ClaimBlockedNotice from "@/app/claim/ClaimBlockedNotice";
+import { claimTaskBlock } from "@/app/claim/task-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +17,16 @@ export default async function NewClaimPage() {
   const userPosition =
     (session.user as { position?: string | null } | undefined)?.position ?? null;
   const userName = session.user?.name ?? null;
+
+  // Task Manager gate (2026-09-03) — see claim/task-gate.ts.
+  const taskBlock = userEmail ? await claimTaskBlock(userEmail) : null;
+  if (taskBlock) {
+    return (
+      <AppShell email={userEmail} role={userRole} name={userName}>
+        <ClaimBlockedNotice gate={taskBlock} />
+      </AppShell>
+    );
+  }
 
   // Resolve user's current department (if any)
   let userDepartment: string | null = null;

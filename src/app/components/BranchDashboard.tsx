@@ -463,11 +463,11 @@ export default function BranchDashboard({
                 // bg without a paired strong-blue label would break dark-mode
                 // contrast (light text-on-navy), so this branch is left
                 // fully literal (bg+border+iconBg+labelColor together).
-                let bg = "#EFF6FF";
-                let border = "1px solid #DBEAFE";
-                let iconBg = "#3B82F6";
-                let iconColor = "#FFFFFF";
-                let labelColor = "#2563EB";
+                let bg = "var(--tint-blue)";
+                let border = "1px solid var(--status-blue-bg)";
+                let iconBg = "var(--accent-blue)";
+                let iconColor = "var(--surface)";
+                let labelColor = "var(--accent-blue)";
                 let IconComponent = UserCheck;
 
                 if (a.label === "Present") {
@@ -491,10 +491,10 @@ export default function BranchDashboard({
                 } else if (a.label === "Annual Leave") {
                   // Same blue-tint case as the pre-loop default above — left
                   // fully literal for the same dark-mode contrast reason.
-                  bg = "#EFF6FF";
-                  border = "1px solid #DBEAFE";
-                  iconBg = "#3B82F6";
-                  labelColor = "#1D4ED8";
+                  bg = "var(--tint-blue)";
+                  border = "1px solid var(--status-blue-bg)";
+                  iconBg = "var(--accent-blue)";
+                  labelColor = "var(--accent-blue)";
                   IconComponent = Calendar;
                 }
 
@@ -611,13 +611,13 @@ export default function BranchDashboard({
                       <div style={{ position: "relative", width: 50, height: 50, display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%" }}>
                           {/* Ribbon */}
-                          <polygon points="35,50 15,95 38,95 50,75" fill="#EF4444" />
-                          <polygon points="65,50 85,95 62,95 50,75" fill="#DC2626" />
+                          <polygon points="35,50 15,95 38,95 50,75" fill="var(--accent-red)" />
+                          <polygon points="65,50 85,95 62,95 50,75" fill="var(--status-red-fg)" />
                           {/* Medal body */}
                           <circle cx="50" cy="50" r="34" fill="#FBBF24" stroke="#D97706" strokeWidth="4" />
                           <circle cx="50" cy="50" r="28" fill="#FCD34D" />
                         </svg>
-                        <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", fontSize: 16, fontWeight: 800, color: "#92400E" }}>
+                        <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", fontSize: 16, fontWeight: 800, color: "var(--accent-amber-strong)" }}>
                           {rankVal}
                         </span>
                       </div>
@@ -661,7 +661,7 @@ export default function BranchDashboard({
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
                       <span style={{ color: "var(--text-muted-strong)", fontWeight: 500 }}>Profit:</span>
-                      <span style={{ color: "var(--cat-green-fg)", fontWeight: 700 }}>{formatRM(profitVal)}</span>
+                      <span style={{ color: "var(--accent-green-strong)", fontWeight: 700 }}>{formatRM(profitVal)}</span>
                     </div>
                   </div>
                 </div>
@@ -931,13 +931,13 @@ export default function BranchDashboard({
                       alignItems: "start",
                       gap: 8,
                       padding: "8px 10px",
-                      background: "#EFF6FF",
-                      border: "0.5px solid #BFDBFE",
+                      background: "var(--tint-blue)",
+                      border: "0.5px solid var(--status-blue-bg)",
                       borderRadius: 8,
                     }}
                   >
-                    <Megaphone style={{ width: 13, height: 13, color: "#1D4ED8", marginTop: 2, flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: "#1E40AF", lineHeight: 1.4 }}>
+                    <Megaphone style={{ width: 13, height: 13, color: "var(--accent-blue)", marginTop: 2, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: "var(--accent-blue)", lineHeight: 1.4 }}>
                       {a}
                     </span>
                   </div>

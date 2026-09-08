@@ -558,13 +558,13 @@ function ManpowerCostReportContent() {
 
         {isEmployeeView ? (
           loading ? (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-16 text-center">
+            <div className="bg-white rounded-2xl border border-slate-200 p-16 text-center dark:bg-slate-900 dark:border-slate-800">
               <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
               <p className="text-slate-500 dark:text-slate-400 font-medium">Loading your manpower data...</p>
             </div>
           ) : error ? (
-            <div className="bg-red-50 dark:bg-red-900/40 border border-red-200 dark:border-red-700 rounded-2xl p-6 text-center">
-              <p className="text-red-600 dark:text-red-300 font-medium">{error}</p>
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center dark:bg-red-900 dark:border-red-700">
+              <p className="text-red-600 dark:text-red-400 font-medium">{error}</p>
             </div>
           ) : (
             <EmployeeBreakdown
@@ -585,30 +585,30 @@ function ManpowerCostReportContent() {
           <>
             {/* KPI cards */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-          <div className="rounded-2xl p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+          <div className="rounded-2xl p-4 bg-white border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Staff</p>
-            <p className="text-2xl font-black text-slate-700 dark:text-slate-200">{totals.totalStaff}</p>
+            <p className="text-2xl font-black text-slate-700 dark:text-slate-300">{totals.totalStaff}</p>
             <p className="text-[10px] text-slate-400 mt-0.5">PT: {totals.ptCount} | FT: {totals.ftCount}</p>
           </div>
-          <div className="rounded-2xl p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+          <div className="rounded-2xl p-4 bg-white border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Hours</p>
             <p className="text-xl font-black text-blue-600 dark:text-blue-400">{fmtHrs(totals.totalHrs)}</p>
           </div>
-          <div className="rounded-2xl p-4 bg-orange-50 dark:bg-orange-900/40 border border-orange-200 dark:border-orange-700">
-            <p className="text-[10px] font-bold text-orange-400 dark:text-orange-300 uppercase tracking-wider mb-1">Coach Hours</p>
-            <p className="text-xl font-black text-orange-600 dark:text-orange-300">{fmtHrs(totals.totalCoachHrs)}</p>
+          <div className="rounded-2xl p-4 bg-orange-50 border border-orange-200 dark:bg-orange-900 dark:border-orange-700">
+            <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider mb-1 dark:text-orange-300">Coach Hours</p>
+            <p className="text-xl font-black text-orange-600 dark:text-orange-400">{fmtHrs(totals.totalCoachHrs)}</p>
           </div>
-          <div className="rounded-2xl p-4 bg-indigo-50 dark:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-700">
-            <p className="text-[10px] font-bold text-indigo-400 dark:text-indigo-300 uppercase tracking-wider mb-1">Exec Hours</p>
-            <p className="text-xl font-black text-indigo-600 dark:text-indigo-300">{fmtHrs(totals.totalExecHrs)}</p>
+          <div className="rounded-2xl p-4 bg-indigo-50 border border-indigo-200 dark:bg-indigo-900 dark:border-indigo-700">
+            <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1 dark:text-indigo-300">Exec Hours</p>
+            <p className="text-xl font-black text-indigo-600 dark:text-indigo-400">{fmtHrs(totals.totalExecHrs)}</p>
           </div>
-          <div className="rounded-2xl p-4 bg-green-50 dark:bg-green-900/40 border border-green-200 dark:border-green-700">
-            <p className="text-[10px] font-bold text-green-400 dark:text-green-300 uppercase tracking-wider mb-1">PT Cost</p>
-            <p className="text-xl font-black text-green-600 dark:text-green-300">
+          <div className="rounded-2xl p-4 bg-green-50 border border-green-200 dark:bg-green-900 dark:border-green-700">
+            <p className="text-[10px] font-bold text-green-400 uppercase tracking-wider mb-1 dark:text-green-300">PT Cost</p>
+            <p className="text-xl font-black text-green-600 dark:text-green-400">
               RM {totals.totalPay.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
             </p>
           </div>
-          <div className="rounded-2xl p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+          <div className="rounded-2xl p-4 bg-white border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Avg / PT</p>
             <p className="text-xl font-black text-slate-600 dark:text-slate-300">
               RM {totals.ptCount > 0 ? (totals.totalPay / totals.ptCount).toFixed(0) : "0"}
@@ -617,7 +617,7 @@ function ManpowerCostReportContent() {
         </div>
 
         {/* Rate info bar + PDF */}
-        <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-5 py-3 mb-6 flex items-center justify-between flex-wrap gap-2">
+        <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 mb-6 flex items-center justify-between flex-wrap gap-2 dark:bg-slate-900 dark:border-slate-800">
           <p className="text-xs text-slate-500 dark:text-slate-400">
             <span className="font-bold text-slate-700 dark:text-slate-300">Exec Rate:</span> RM {execRate}/hr (fixed)
             <span className="mx-3 text-slate-300 dark:text-slate-600">|</span>
@@ -647,7 +647,7 @@ function ManpowerCostReportContent() {
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search name..."
-                className="pl-9 pr-4 py-2.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 rounded-xl text-sm text-slate-700 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-400 outline-none transition-all w-[180px]"
+                className="pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-400 outline-none transition-all w-[180px] dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100"
               />
             </div>
 
@@ -713,7 +713,7 @@ function ManpowerCostReportContent() {
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
-                className="px-4 py-2.5 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 text-red-600 dark:text-red-200 rounded-xl text-sm font-bold hover:bg-red-100 dark:hover:bg-red-800 transition-all"
+                className="px-4 py-2.5 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-100 transition-all dark:bg-red-900 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-800"
               >
                 Clear
               </button>
@@ -727,7 +727,7 @@ function ManpowerCostReportContent() {
           <div className="max-h-[70vh] overflow-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                <tr className="bg-slate-50 border-b border-slate-200 dark:bg-slate-800 dark:border-slate-700">
                   <th className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-800 px-5 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
                   <th className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-800 px-5 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Branch</th>
                   <th className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-800 px-5 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">Type</th>
@@ -880,7 +880,7 @@ function EmployeeBreakdown({
   return (
     <>
       {/* Profile card */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 mb-6">
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6 dark:bg-slate-900 dark:border-slate-800">
         <div className="flex items-center gap-5 flex-wrap">
           <div className="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center text-lg font-black text-white shrink-0">
             {initials}
@@ -892,8 +892,8 @@ function EmployeeBreakdown({
               <span className="text-slate-300 dark:text-slate-600">|</span>
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
                 s.isPT
-                  ? "bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-700"
-                  : "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 border border-blue-200 dark:border-blue-700"
+                  ? "bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-900 dark:text-purple-300 dark:border-purple-700"
+                  : "bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-700"
               }`}>
                 {s.isPT ? "Part-Time" : "Full-Time"}
               </span>
@@ -950,22 +950,22 @@ function EmployeeBreakdown({
 
       {/* KPI cards (3 for FT, 4 for PT) */}
       <div className={`grid grid-cols-2 ${s.isPT ? "md:grid-cols-4" : "md:grid-cols-3"} gap-4 mb-6`}>
-        <div className="rounded-2xl p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+        <div className="rounded-2xl p-4 bg-white border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Hours</p>
           <p className="text-xl font-black text-blue-600 dark:text-blue-400">{fmtHrs(s.totalHrs)}</p>
         </div>
-        <div className="rounded-2xl p-4 bg-orange-50 dark:bg-orange-900/40 border border-orange-200 dark:border-orange-700">
-          <p className="text-[10px] font-bold text-orange-400 dark:text-orange-300 uppercase tracking-wider mb-1">Coach Hours</p>
-          <p className="text-xl font-black text-orange-600 dark:text-orange-300">{fmtHrs(s.coachHrs)}</p>
+        <div className="rounded-2xl p-4 bg-orange-50 border border-orange-200 dark:bg-orange-900 dark:border-orange-700">
+          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider mb-1 dark:text-orange-300">Coach Hours</p>
+          <p className="text-xl font-black text-orange-600 dark:text-orange-400">{fmtHrs(s.coachHrs)}</p>
         </div>
-        <div className="rounded-2xl p-4 bg-indigo-50 dark:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-700">
-          <p className="text-[10px] font-bold text-indigo-400 dark:text-indigo-300 uppercase tracking-wider mb-1">Exec Hours</p>
-          <p className="text-xl font-black text-indigo-600 dark:text-indigo-300">{fmtHrs(s.execHrs)}</p>
+        <div className="rounded-2xl p-4 bg-indigo-50 border border-indigo-200 dark:bg-indigo-900 dark:border-indigo-700">
+          <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1 dark:text-indigo-300">Exec Hours</p>
+          <p className="text-xl font-black text-indigo-600 dark:text-indigo-400">{fmtHrs(s.execHrs)}</p>
         </div>
         {s.isPT && (
-          <div className="rounded-2xl p-4 bg-green-50 dark:bg-green-900/40 border border-green-200 dark:border-green-700">
-            <p className="text-[10px] font-bold text-green-400 dark:text-green-300 uppercase tracking-wider mb-1">Total Pay</p>
-            <p className="text-xl font-black text-green-600 dark:text-green-300">
+          <div className="rounded-2xl p-4 bg-green-50 border border-green-200 dark:bg-green-900 dark:border-green-700">
+            <p className="text-[10px] font-bold text-green-400 uppercase tracking-wider mb-1 dark:text-green-300">Total Pay</p>
+            <p className="text-xl font-black text-green-600 dark:text-green-400">
               RM {s.totalPay.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
             </p>
           </div>
@@ -973,8 +973,8 @@ function EmployeeBreakdown({
       </div>
 
       {/* Daily Breakdown (shown directly, no expand) */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
-        <div className="px-5 py-3 flex items-center justify-between bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden dark:bg-slate-900 dark:border-slate-800">
+        <div className="px-5 py-3 flex items-center justify-between bg-slate-50 border-b border-slate-200 dark:bg-slate-800 dark:border-slate-700">
           <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
             Daily Breakdown — <span className="text-blue-600 dark:text-blue-400">{weekFilter ? `${weekStart} to ${weekEnd}` : monthLabel}</span>
           </p>
@@ -986,26 +986,26 @@ function EmployeeBreakdown({
           <table className="w-full text-left">
             <thead>
               {s.isPT ? (
-                <tr className="text-[10px] font-bold uppercase tracking-wider bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                <tr className="text-[10px] font-bold uppercase tracking-wider bg-slate-50 border-b border-slate-200 dark:bg-slate-800 dark:border-slate-700">
                   <th className="px-3 py-3 text-slate-400 w-10">No.</th>
                   <th className="px-3 py-3 text-slate-400">Day</th>
                   <th className="px-3 py-3 text-slate-400">Date</th>
-                  <th className="px-3 py-3 text-orange-400 text-center">Coach Hr</th>
-                  <th className="px-3 py-3 text-orange-400 text-center">Rate</th>
-                  <th className="px-3 py-3 text-orange-500 dark:text-orange-400 text-center">Total</th>
-                  <th className="px-3 py-3 text-indigo-400 text-center">Exec Hr</th>
-                  <th className="px-3 py-3 text-indigo-400 text-center">Rate</th>
-                  <th className="px-3 py-3 text-indigo-500 dark:text-indigo-400 text-center">Total</th>
-                  <th className="px-3 py-3 text-green-600 dark:text-green-400 text-right">Total Pay</th>
+                  <th className="px-3 py-3 text-orange-400 text-center dark:text-orange-300">Coach Hr</th>
+                  <th className="px-3 py-3 text-orange-400 text-center dark:text-orange-300">Rate</th>
+                  <th className="px-3 py-3 text-orange-500 text-center dark:text-orange-400">Total</th>
+                  <th className="px-3 py-3 text-indigo-400 text-center dark:text-indigo-300">Exec Hr</th>
+                  <th className="px-3 py-3 text-indigo-400 text-center dark:text-indigo-300">Rate</th>
+                  <th className="px-3 py-3 text-indigo-500 text-center dark:text-indigo-400">Total</th>
+                  <th className="px-3 py-3 text-green-600 text-right dark:text-green-400">Total Pay</th>
                 </tr>
               ) : (
-                <tr className="text-xs font-bold uppercase tracking-wider bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                <tr className="text-xs font-bold uppercase tracking-wider bg-slate-50 border-b border-slate-200 dark:bg-slate-800 dark:border-slate-700">
                   <th className="px-4 py-3 text-slate-400 w-12">No.</th>
                   <th className="px-4 py-3 text-slate-400">Day</th>
                   <th className="px-4 py-3 text-slate-400">Date</th>
-                  <th className="px-4 py-3 text-orange-400 text-center">Coach Hr</th>
-                  <th className="px-4 py-3 text-indigo-400 text-center">Exec Hr</th>
-                  <th className="px-4 py-3 text-blue-400 text-center">Total Hr</th>
+                  <th className="px-4 py-3 text-orange-400 text-center dark:text-orange-300">Coach Hr</th>
+                  <th className="px-4 py-3 text-indigo-400 text-center dark:text-indigo-300">Exec Hr</th>
+                  <th className="px-4 py-3 text-blue-400 text-center dark:text-blue-300">Total Hr</th>
                 </tr>
               )}
             </thead>
@@ -1019,9 +1019,9 @@ function EmployeeBreakdown({
                 const dayPay = coachPayDay + execPayDay;
                 const isReplacement = worked && entry.scheduleBranch;
                 const rowCls = `transition-colors ${
-                  !worked ? "bg-slate-50/50 dark:bg-slate-800/40 text-slate-300 dark:text-slate-600"
-                  : isReplacement ? "bg-amber-50/50 dark:bg-amber-900/30 hover:bg-amber-50/80 dark:hover:bg-amber-900/50"
-                  : isWeekend ? "bg-blue-50/30 dark:bg-blue-900/20 hover:bg-blue-50/50 dark:hover:bg-blue-900/40"
+                  !worked ? "bg-slate-50/50 text-slate-300 dark:bg-slate-800/50 dark:text-slate-600"
+                  : isReplacement ? "bg-amber-50/50 hover:bg-amber-50/80 dark:bg-amber-900/30 dark:hover:bg-amber-900/50"
+                  : isWeekend ? "bg-blue-50/30 hover:bg-blue-50/50 dark:bg-blue-900/20 dark:hover:bg-blue-900/30"
                   : "hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
                 }`;
 
@@ -1036,7 +1036,7 @@ function EmployeeBreakdown({
                     <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
                       {row.date}
                       {isReplacement && (
-                        <span className="ml-1 text-[9px] font-bold text-amber-600 dark:text-amber-300 bg-amber-100 dark:bg-amber-900 px-1.5 py-0.5 rounded">
+                        <span className="ml-1 text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded dark:text-amber-300 dark:bg-amber-900">
                           @ {entry.scheduleBranch}
                         </span>
                       )}
@@ -1050,7 +1050,7 @@ function EmployeeBreakdown({
                       {worked && entry.coachHrs > 0 ? `RM${s.rate}` : "-"}
                     </td>
                     <td className="px-3 py-2 text-center text-xs font-bold">
-                      <span className={worked && coachPayDay > 0 ? "text-orange-700 dark:text-orange-300" : "text-slate-300 dark:text-slate-600"}>
+                      <span className={worked && coachPayDay > 0 ? "text-orange-700 dark:text-orange-400" : "text-slate-300 dark:text-slate-600"}>
                         {worked && coachPayDay > 0 ? `RM ${coachPayDay.toFixed(2)}` : "-"}
                       </span>
                     </td>
@@ -1063,7 +1063,7 @@ function EmployeeBreakdown({
                       {worked && entry.execHrs > 0 ? `RM${execRate}` : "-"}
                     </td>
                     <td className="px-3 py-2 text-center text-xs font-bold">
-                      <span className={worked && execPayDay > 0 ? "text-indigo-700 dark:text-indigo-300" : "text-slate-300 dark:text-slate-600"}>
+                      <span className={worked && execPayDay > 0 ? "text-indigo-700 dark:text-indigo-400" : "text-slate-300 dark:text-slate-600"}>
                         {worked && execPayDay > 0 ? `RM ${execPayDay.toFixed(2)}` : "-"}
                       </span>
                     </td>
@@ -1084,7 +1084,7 @@ function EmployeeBreakdown({
                     <td className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">
                       {row.date}
                       {isReplacement && (
-                        <span className="ml-1 text-[9px] font-bold text-amber-600 dark:text-amber-300 bg-amber-100 dark:bg-amber-900 px-1.5 py-0.5 rounded">
+                        <span className="ml-1 text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded dark:text-amber-300 dark:bg-amber-900">
                           @ {entry.scheduleBranch}
                         </span>
                       )}
@@ -1167,7 +1167,7 @@ function Row({
       <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
         <td className="px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300">
+            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
               {initials}
             </div>
             <div>
@@ -1181,8 +1181,8 @@ function Row({
           <span
             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
               s.isPT
-                ? "bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-700"
-                : "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 border border-blue-200 dark:border-blue-700"
+                ? "bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-900 dark:text-purple-300 dark:border-purple-700"
+                : "bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-700"
             }`}
           >
             {s.isPT ? "PT" : "FT"}
@@ -1205,7 +1205,7 @@ function Row({
         <td className="px-5 py-4 text-center">
           <button
             onClick={onView}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/50 transition-all"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all dark:hover:text-blue-400 dark:hover:bg-blue-900"
             title="View Daily Breakdown"
           >
             <Eye className="w-4 h-4" />
@@ -1237,7 +1237,7 @@ function ToolbarSelect({ value, onChange, options, icon }: ToolbarSelectProps) {
       <select
         value={value}
         onChange={e => onChange(e.target.value)}
-        className={`appearance-none ${icon ? "pl-9" : "pl-4"} pr-9 py-2.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-500 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-400 outline-none transition-all cursor-pointer`}
+        className={`appearance-none ${icon ? "pl-9" : "pl-4"} pr-9 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-400 outline-none transition-all cursor-pointer dark:bg-slate-950 dark:border-slate-500 dark:text-slate-100`}
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2364748b' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
           backgroundRepeat: "no-repeat",

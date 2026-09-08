@@ -1,4 +1,5 @@
 import { EMPLOYEE_RECORD_CATEGORIES, findRecordCategory } from "@/lib/employeeRecordConfig";
+import type { EmployeeStage } from "@/lib/employeeStages";
 import type {
   DocumentsInfo,
   PayrollInfo,
@@ -192,6 +193,42 @@ export function exitNewSections(): string[] {
     "system-revocation",
     "financial-settlement",
   ];
+}
+
+// Extracted from src/app/employee-record/[id]/[category]/[section]/page.tsx
+// (2026-08-28, see conversation) — shared now by that page AND the
+// /employee-record/[id] redirect shim, which needs the exact same
+// "what's new for this person" computation to land them on their first new
+// section by default, matching the stage-folder pages' own firstNewSection-
+// based default landing instead of always Personal Info.
+//
+// A Probation-effective employee (override.stage === "probation", which per
+// getRealAccountLifecycleOverride's own source always pairs with
+// extraStages: ["onboarding"] — Probation is inherently an Onboarding
+// sub-state, never reached any other way) is deliberately mapped to
+// ONBOARDING's own new-section function, not a Probation-specific one —
+// Onboarding's set is already the superset (its HR Info list already
+// includes "probation" as a sub-tab), so showing the narrower Probation-only
+// set here would be a regression relative to what Onboarding already shows.
+// This mapping intentionally ignores extraStages — checking stage ===
+// "probation" alone is sufficient (confirmed via the override's own source).
+export function normalizeStageForVisibility(stage: EmployeeStage): "pre" | "onboarding" | "active" | "exit" {
+  if (stage === "probation") return "onboarding";
+  if (stage === "pre" || stage === "onboarding" || stage === "active" || stage === "exit") return stage;
+  return "pre";
+}
+
+// Kept in sync with normalizeStageForVisibility above rather than a separate
+// rule, since "what's new" only makes sense relative to whatever set of
+// sections is actually visible (a Probation-effective employee seeing
+// Onboarding's fuller set should also get Onboarding's own "what's new"
+// tracking, e.g. Doc/Tax Info, not just Probation's narrower one).
+export function newSectionsForStage(stage: EmployeeStage): string[] {
+  const normalized = normalizeStageForVisibility(stage);
+  if (normalized === "pre") return PRE_NEW_SECTIONS;
+  if (normalized === "onboarding") return onboardingNewSections();
+  if (normalized === "active") return activeNewSections();
+  return exitNewSections();
 }
 
 /** Per-section "is this genuinely empty" check (2026-08-26, see
