@@ -48,6 +48,7 @@ import { getRealAccountLifecycleOverride } from "@/lib/careerApplicationSync";
 import { getProbationDisplayInfo } from "@/lib/probationDecision";
 import { canEditProfile } from "@/lib/employeeRecordActions";
 import { getCurrentEmployeeScope } from "@/lib/employeeScope";
+import { resolveEmployeeSectionRestriction } from "@/lib/employeeSectionAccess";
 import {
   PRE_VISIBLE_SECTIONS,
   onboardingVisibleSections,
@@ -57,6 +58,7 @@ import {
   entirelyNewCategories,
   normalizeStageForVisibility,
   newSectionsForStage,
+  isSectionVisible,
 } from "@/lib/employeeVisibleSections";
 
 export const dynamic = "force-dynamic";
@@ -133,7 +135,25 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
   const override = isCandidate ? undefined : await getRealAccountLifecycleOverride({ ...employee, stage: employeeStage });
   const effectiveStage: EmployeeStage = override?.stage ?? employeeStage;
   const isFullTime = positionGroup(employee.position) === "Full Time";
-  const visibleSectionKeys = visibleSectionsForStage(effectiveStage, isFullTime);
+  const stageVisibleSectionKeys = visibleSectionsForStage(effectiveStage, isFullTime);
+  // Role-based narrowing (2026-09-08, see conversation) — layered on top of
+  // the stage map above, never widening it. Safe to call unconditionally,
+  // including for a candidate (negative numId): resolveEmployeeSectionRestriction's
+  // own self-check/subject-role lookup both simply no-match/no-op for a
+  // subjectUserId that isn't a real users.user_id.
+  const visibleSectionKeys = await resolveEmployeeSectionRestriction(stageVisibleSectionKeys, employee.id);
+  // Reject here, before ever rendering (2026-09-08, see conversation — bug
+  // fix) — EmployeeRecordView's own currentCategory resolution falls back to
+  // the RAW category prop (this page's own `cat`, built from findRecordCategory
+  // above, unfiltered) whenever the URL's category/section isn't in
+  // visibleSectionKeys, which used to be harmless when visibility was only
+  // stage-based (the underlying data for a not-yet-reached stage is often
+  // simply not fetched, so the fallback rendered nothing real) but is a real
+  // bypass now that a category can be hidden by ROLE while its data is still
+  // fetched unconditionally (Payroll/Disciplinary/Medical Check etc. don't
+  // vary their fetch by viewer role) — a direct URL to a role-hidden
+  // category/section would otherwise still render its real content.
+  if (!isSectionVisible(visibleSectionKeys, category, section)) notFound();
   const newSectionKeys = newSectionsForStage(effectiveStage);
   const isOnboardingOrLater = normalizeStageForVisibility(effectiveStage) !== "pre";
   const isActiveOrExit =

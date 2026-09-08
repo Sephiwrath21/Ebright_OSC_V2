@@ -453,6 +453,8 @@ export async function updateMedicalCheck(userId: number, input: UpdateMedicalChe
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const existing = await prisma.medical_check.findUnique({ where: { user_id: userId } });
 
@@ -736,6 +738,8 @@ export async function updatePayroll(userId: number, input: UpdatePayrollInput): 
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const existing = await prisma.payroll.findUnique({ where: { user_id: userId } });
 
@@ -824,6 +828,8 @@ export async function addSalaryRevision(userId: number, input: AddSalaryRevision
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     let attachmentFileId: string | null = null;
     if (input.attachmentFile) {
@@ -1031,6 +1037,8 @@ export async function updateNda(userId: number, input: UpdateNdaInput): Promise<
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const existing = await prisma.nda.findUnique({ where: { user_id: userId } });
 
@@ -1072,6 +1080,8 @@ export async function updateNonCompete(userId: number, input: UpdateNonCompeteIn
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const existing = await prisma.non_compete.findUnique({ where: { user_id: userId } });
 
@@ -1540,6 +1550,8 @@ export async function addDomesticInquiry(userId: number, input: AddDomesticInqui
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     let attachmentFileId: string | null = null;
     if (input.attachmentFile) {
@@ -1579,6 +1591,8 @@ export async function addSuspensionLetter(userId: number, input: AddSuspensionLe
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     let attachmentFileId: string | null = null;
     if (input.attachmentFile) {
@@ -1620,6 +1634,8 @@ export async function addShowcauseWarningLetter(userId: number, input: AddShowca
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     let attachmentFileId: string | null = null;
     if (input.attachmentFile) {
@@ -1661,6 +1677,8 @@ export async function addPip(userId: number, input: AddPipInput): Promise<Action
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     await prisma.pip.create({
       data: {
@@ -1880,6 +1898,8 @@ export async function updateDomesticInquiry(userId: number, id: number, input: A
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const existing = await prisma.domestic_inquiry.findUnique({ where: { domestic_inquiry_id: id } });
     if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
@@ -1915,6 +1935,8 @@ export async function updateSuspensionLetter(userId: number, id: number, input: 
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const existing = await prisma.suspension_letter.findUnique({ where: { suspension_letter_id: id } });
     if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
@@ -1955,6 +1977,8 @@ export async function updateShowcauseWarningLetter(
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const existing = await prisma.showcause_warning_letter.findUnique({ where: { showcause_warning_letter_id: id } });
     if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
@@ -1992,6 +2016,8 @@ export async function updatePip(userId: number, id: number, input: AddPipInput):
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const existing = await prisma.pip.findUnique({ where: { pip_id: id } });
     if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
@@ -2023,6 +2049,8 @@ export async function updateSalaryRevision(userId: number, id: number, input: Ad
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const existing = await prisma.salary_revision.findUnique({ where: { salary_revision_id: id } });
     if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
@@ -2119,6 +2147,8 @@ export async function deleteSalaryRevision(userId: number, id: number): Promise<
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const row = await prisma.salary_revision.findUnique({ where: { salary_revision_id: id } });
     if (!row || row.user_id !== userId) return { ok: false, error: "Record not found." };
@@ -2182,6 +2212,8 @@ export async function deleteDomesticInquiry(userId: number, id: number): Promise
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const row = await prisma.domestic_inquiry.findUnique({ where: { domestic_inquiry_id: id } });
     if (!row || row.user_id !== userId) return { ok: false, error: "Record not found." };
@@ -2198,6 +2230,8 @@ export async function deleteSuspensionLetter(userId: number, id: number): Promis
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const row = await prisma.suspension_letter.findUnique({ where: { suspension_letter_id: id } });
     if (!row || row.user_id !== userId) return { ok: false, error: "Record not found." };
@@ -2214,6 +2248,8 @@ export async function deleteShowcauseWarningLetter(userId: number, id: number): 
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const row = await prisma.showcause_warning_letter.findUnique({ where: { showcause_warning_letter_id: id } });
     if (!row || row.user_id !== userId) return { ok: false, error: "Record not found." };
@@ -2230,6 +2266,8 @@ export async function deletePip(userId: number, id: number): Promise<ActionResul
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const row = await prisma.pip.findUnique({ where: { pip_id: id } });
     if (!row || row.user_id !== userId) return { ok: false, error: "Record not found." };
@@ -2419,6 +2457,8 @@ export async function updatePayslip(userId: number, input: UpdatePayslipInput): 
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const fields = {
       basic_pay: input.basicPay ? Number.parseFloat(input.basicPay) : null,
@@ -2449,6 +2489,8 @@ export async function addPayslipHistory(userId: number, input: AddPayslipHistory
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   if (!input.month) return { ok: false, error: "Month is required." };
   if (!input.attachmentFile) return { ok: false, error: "Payslip file is required." };
   try {
@@ -2470,6 +2512,8 @@ export async function deletePayslipHistory(userId: number, id: number): Promise<
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const row = await prisma.payslip_history.findUnique({ where: { payslip_history_id: id } });
     if (!row || row.user_id !== userId) return { ok: false, error: "Record not found." };

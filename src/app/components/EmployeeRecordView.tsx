@@ -7,7 +7,7 @@ import { ChevronDown, ChevronRight, Home } from "lucide-react";
 import { initialsFromName } from "@/lib/text";
 import OverdueDot from "@/app/components/OverdueDot";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
-import { EMPLOYEE_RECORD_CATEGORIES, type RecordCategory } from "@/lib/employeeRecordConfig";
+import { EMPLOYEE_RECORD_CATEGORIES, type RecordCategory, type RecordSection } from "@/lib/employeeRecordConfig";
 import { STAGE_LABELS, type EmployeeStage } from "@/lib/employeeStages";
 import { profileUrlForStage } from "@/lib/stageProfileConfig";
 import { proceedFromPreStage, proceedFromOnboarding, proceedFromActive } from "@/lib/employeeRecordActions";
@@ -190,6 +190,23 @@ const CAT_TAB_SIZE = { pad: "px-2.5 py-1.5", text: "text-sm", gap: "gap-1" };
 // corner instead of the whole pill's. Reuses OverdueDot unmodified (still
 // rendered inline everywhere else — every sub-tab site here, plus namelist
 // rows elsewhere) — only this wrapper is new.
+// Moves any of `firstKeys` (in the order given) to the front of `sections`;
+// everything else keeps its original relative order after them (2026-09-08,
+// see conversation — Probation's "Probation" sub-tab needs to render first
+// without reordering EMPLOYEE_RECORD_CATEGORIES itself, which every other
+// page/stage still relies on staying in its existing order). Returns the
+// same array reference, unchanged, when there's nothing to reorder or
+// nothing in `sections` actually matches — so callers can cheaply tell
+// "nothing changed" via `===` instead of always allocating a new object.
+function reorderSectionsFirst(sections: RecordSection[], firstKeys: string[] | undefined): RecordSection[] {
+  if (!firstKeys || firstKeys.length === 0) return sections;
+  const firstSet = new Set(firstKeys);
+  if (!sections.some((s) => firstSet.has(s.key))) return sections;
+  const first = firstKeys.map((k) => sections.find((s) => s.key === k)).filter((s): s is RecordSection => Boolean(s));
+  const rest = sections.filter((s) => !firstSet.has(s.key));
+  return [...first, ...rest];
+}
+
 function cornerDot(show: boolean) {
   if (!show) return null;
   return (
@@ -305,6 +322,20 @@ interface Props {
    *  undefined (default) shows every category/section unfiltered — the real
    *  /employee-record/[id] page's exact current behavior, unaffected. */
   visibleSectionKeys?: Record<string, string[]>;
+  /** Stage-specific sub-tab reorder. Keyed by category key: listed section
+   *  keys move to the front, in the order given; everything else in that
+   *  category keeps its original relative order after them. A category key
+   *  absent here (or the whole prop omitted, the default) leaves that
+   *  category's order exactly as EMPLOYEE_RECORD_CATEGORIES/
+   *  visibleSectionKeys' own filter already produces.
+   *
+   *  UNUSED as of 2026-09-08 (see conversation, same day it was added) —
+   *  briefly used to move Probation's "Probation" sub-tab first, but that
+   *  was reverted: the user wants its position to match the real Employee
+   *  Record page's own static order instead. Left in place (not deleted) in
+   *  case a future stage genuinely needs reordering — no current caller
+   *  passes this prop, so it's a pure no-op everywhere today. */
+  sectionOrderFirst?: Record<string, string[]>;
   /** "route" (default) — current behavior: category tabs are real
    *  navigation Links to `${basePath}/${cat.key}`. "client" — for embedded
    *  usage on a single URL (Pre stage, 2026-08-26): category switching
@@ -413,6 +444,7 @@ export default function EmployeeRecordView({
   canAddChecklistItem,
   canEdit = true,
   visibleSectionKeys,
+  sectionOrderFirst,
   categoryNavigationMode = "route",
   basePath = `/employee-record/${employeeId}`,
   breadcrumbLabel = "Employee Record",
@@ -446,15 +478,27 @@ export default function EmployeeRecordView({
   const visibleCategories = visibleSectionKeys
     ? EMPLOYEE_RECORD_CATEGORIES.filter((c) => c.key in visibleSectionKeys).map((c) => {
         const allowed = visibleSectionKeys[c.key];
-        return allowed.length > 0 ? { ...c, sections: c.sections.filter((s) => allowed.includes(s.key)) } : c;
+        const filtered = allowed.length > 0 ? c.sections.filter((s) => allowed.includes(s.key)) : c.sections;
+        const sections = reorderSectionsFirst(filtered, sectionOrderFirst?.[c.key]);
+        return sections === c.sections ? c : { ...c, sections };
       })
     : EMPLOYEE_RECORD_CATEGORIES;
   const tabSize = CAT_TAB_SIZE;
   const [activeCategoryKey, setActiveCategoryKey] = useState(category.key);
+  // "route" mode's fallback used to be `?? category` (the raw, unfiltered
+  // prop) — safe when visibleSectionKeys is undefined (category IS the
+  // correct thing to show then), but a real bypass once a category can be
+  // role-hidden while its data still gets fetched regardless: a direct URL
+  // to a hidden category found nothing in visibleCategories and fell back to
+  // rendering the real, full category anyway (2026-09-08, see conversation —
+  // bug fix; the page-level notFound() guard added alongside this is the
+  // primary defense, this is defense-in-depth for any caller that forgets
+  // it). Now falls back to visibleCategories[0] instead, same as "client"
+  // mode already did — always something actually in scope, never the raw prop.
   const currentCategory =
     categoryNavigationMode === "client"
       ? (visibleCategories.find((c) => c.key === activeCategoryKey) ?? visibleCategories[0])
-      : (visibleCategories.find((c) => c.key === category.key) ?? category);
+      : (visibleCategories.find((c) => c.key === category.key) ?? (visibleSectionKeys ? visibleCategories[0] : category));
   const isClientTabCategory = CLIENT_TAB_CATEGORIES.has(currentCategory.key);
   const [clientSection, setClientSection] = useState(sectionKey);
   const currentSection = isClientTabCategory
@@ -569,36 +613,35 @@ export default function EmployeeRecordView({
             capsule + bg-[#a9d3f7bd] text-[#004386c9] active state as
             EmployeeNamelistView's List/Grid toggle and the Task panel's
             Source filter pills, for visual consistency across the module.
-            w-full on touch (not the old calc(100% - rail width) cap, which
-            was truncating labels like "Finance" by reserving space for a
-            sidebar that's hidden on touch anyway). Tabs that still don't
-            fit are simply not visible until scrolled to (nowrap +
-            overflow-x-auto on touch), never wrapped to a second row, either
-            way. On desktop specifically, NO scroll (2026-08-27, see
-            conversation — the user wants every tab the same fixed size
-            everywhere, CAT_TAB_SIZE above, not scaled by tab count); see
-            CAT_TAB_SIZE's own comment for the fit check at Exit's 7-tab
-            count, the largest this app has today.
+            w-full (not the old calc(100% - rail width) cap, which was
+            truncating labels like "Finance" by reserving space for a
+            sidebar that's hidden on touch anyway). Tabs that don't fit
+            scroll horizontally (nowrap + overflow-x-auto), never wrapped to
+            a second row.
 
-            No overflow-hidden here anymore (2026-08-27, see conversation —
-            corner-badge fix) — it was added as a defensive clip against a
-            row that doesn't fit, but `overflow: hidden` clips BOTH axes,
-            and cornerDot's badges poke a few px above each pill's top edge
-            by design; with overflow-hidden still set, every one of those
-            badges would render fully or partially cut off, the moment the
-            nav's own box (not just an individual pill) starts right at the
-            tab row's top edge with no padding to spare. Left as the CSS
-            default (visible) instead — if the row genuinely doesn't fit at
-            some tab count, the tabs now visibly overflow rather than
-            silently clip, which is what was actually wanted in the first
-            place (see CAT_TAB_SIZE's own comment: "flag me... rather than
-            silently shrinking"). This also fixes a touch-specific version
-            of the same clipping bug that would otherwise still exist:
-            [@media(hover:none)]:overflow-x-auto only ever overrode
-            overflow-x, so with the base overflow-hidden still setting
-            overflow-y, touch's own badges would have stayed clipped too
-            even after this fix's own [@media(hover:none)]:overflow-x-auto
-            override — removing overflow-hidden entirely fixes both at once.
+            UPDATE (2026-09-08, see conversation): desktop was originally
+            "NO scroll, fixed tab size, overflow visibly rather than clips"
+            (2026-08-27 decision — CAT_TAB_SIZE's own comment has the fit-
+            check math for Exit's 7-tab count). That math was flagged, not
+            verified, as its own comment says ("no rendered-browser
+            measurement backs this... if it turns out too tight") — and it
+            turned out too tight the moment Employee Record itself reached 7
+            tabs (Offboarding added): the row visibly spilled out over the
+            white card and the rail beside it instead of the harmless
+            "visible overflow" the 08-27 decision assumed. Reversed to match
+            touch's own overflow-x-auto behavior on desktop too (see the
+            nav's className comment below for the mechanics) rather than
+            revisit CAT_TAB_SIZE's fixed sizing — same "every tab the same
+            size everywhere" rule stays intact, tabs just scroll into view
+            instead of spilling past the card when they don't all fit.
+
+            No overflow-hidden here (2026-08-27, see conversation — corner-
+            badge fix, still true) — `overflow: hidden` clips BOTH axes, and
+            cornerDot's badges poke a few px above each pill's top edge by
+            design; the nav's own overflow-x-auto (below) achieves the same
+            "don't let content spill past the box" result without also
+            clipping the badges vertically, since it's paired with enough
+            top padding for them (see below).
 
             No more ml-4 sm:ml-6 (2026-08-27, see conversation — the user
             wanted the first tab nudged closer to the card's left edge) —
@@ -624,10 +667,27 @@ export default function EmployeeRecordView({
             in column 1 (the card's own column), leaving column 2 (the
             rail's width) as blank space, exactly where the rail already
             sits in the row below. */}
+        {/* Mechanics of the nav's className below: min-w-0 (already present,
+            unchanged) is what lets the grid column shrink below the nav's
+            content width in the first place — without it, flex/grid items
+            default to a content-based minimum, so the track would grow to
+            fit instead of ever triggering the scroll. pt-2 is new (was
+            p-0's implicit 0) because setting overflow-x to a non-visible
+            value forces overflow-y to compute as `auto` too (CSS spec:
+            visible/non-visible mixes always resolve the visible side to
+            auto) — without headroom, cornerDot's badge (rendered at
+            -top-1.5 relative to each pill) would sit outside the padding
+            box and get clipped/scrolled instead of simply showing. 8px
+            clears its ~6px offset with a small buffer, and doesn't itself
+            overflow, so no vertical scrollbar appears. cns-scroll
+            (globals.css) is the same themed slim-scrollbar utility the CRM
+            kanban board's horizontal scroll panes already use — reused here
+            rather than inventing a fade/gradient edge, per that existing
+            pattern. */}
         <div className="grid grid-cols-[minmax(0,1fr)_210px] [@media(hover:none)]:grid-cols-1">
           <nav
             aria-label="Employee record categories"
-            className={`flex flex-nowrap items-center ${tabSize.gap} mb-0 [@media(hover:none)]:overflow-x-auto min-w-0 w-auto [@media(hover:none)]:w-full bg-transparent rounded-none p-0 [@media(hover:none)]:bg-[#eef3fb] dark:[@media(hover:none)]:bg-slate-800 [@media(hover:none)]:rounded-full [@media(hover:none)]:p-1`}
+            className={`cns-scroll flex flex-nowrap items-center ${tabSize.gap} mb-0 overflow-x-auto min-w-0 w-full pt-2 bg-transparent rounded-none p-0 [@media(hover:none)]:bg-[#eef3fb] dark:[@media(hover:none)]:bg-slate-800 [@media(hover:none)]:rounded-full [@media(hover:none)]:p-1`}
           >
             {visibleCategories.map((cat) => {
             const isActive = cat.key === currentCategory.key;

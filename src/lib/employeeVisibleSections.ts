@@ -61,6 +61,15 @@ export const PRE_VISIBLE_SECTIONS: Record<string, string[]> = {
 // through Probation in the first place, so this is a defensive match to the
 // same isFullTime gate Onboarding's own history view of Probation already
 // uses, rather than an assumption Probation-stage rows are always Full Time).
+//
+// UNUSED as of 2026-09-08 (see conversation) — [stage]/employee/[id]/page.tsx
+// switched its stage==="probation" branch to onboardingVisibleSections
+// instead, since Confirm on the Probation profile jumps straight to Active
+// with no separate Onboarding step, so Onboarding's own content (Doc tab,
+// Finance > Tax Info) needs to already be visible/fillable during Probation,
+// not just from Onboarding onward. Left in place rather than deleted, in
+// case something else still references it — grep the repo for
+// `probationVisibleSections` before removing.
 export function probationVisibleSections(isFullTime: boolean): Record<string, string[]> {
   return {
     "personal-info": FULL_PERSONAL_INFO_SECTIONS,
@@ -134,11 +143,31 @@ export function exitVisibleSections(isFullTime: boolean): Record<string, string[
 // "new" here even though it can still be genuinely empty. Pre has nothing
 // new (it's the starting point).
 export const PRE_NEW_SECTIONS: string[] = [];
+// UNUSED as of 2026-09-08 (see conversation) — same reason as
+// probationVisibleSections' own comment above: [stage]/employee/[id]/page.tsx
+// now uses probationStageNewSections() for stage==="probation" (below), not
+// this. Left in place rather than deleted — grep the repo for
+// `probationNewSections` before removing.
 export function probationNewSections(isFullTime: boolean): string[] {
   return isFullTime ? ["probation"] : [];
 }
 export function onboardingNewSections(): string[] {
   return ["handbook", "tax-info"];
+}
+// Probation stage's own new-sections list (2026-09-08, see conversation) —
+// deliberately NOT folded into onboardingNewSections() itself, since that
+// function is also used by the real Onboarding-stage page, which must NOT
+// dot "probation" (a decision already made back at the Probation stage is
+// not "new" once you've reached Onboarding — see onboardingVisibleSections'
+// own comment). "probation" listed first: firstNewSection() (below) picks
+// newSectionKeys[0] as the profile's default-landing tab, so a Probation-
+// stage employee now defaults to HR Info > Probation instead of Doc
+// (intentional — see conversation, Probation is the most relevant tab for
+// someone actually in that stage). Onboarding's own two (handbook/tax-info)
+// come after, unchanged and still spread from the shared function rather
+// than re-listed, so there's exactly one place that defines their content.
+export function probationStageNewSections(): string[] {
+  return ["probation", ...onboardingNewSections()];
 }
 
 // Active stage's new sections — "probation"/"handbook" are cumulative
@@ -337,4 +366,126 @@ export function entirelyNewCategories(visibleSectionKeys: Record<string, string[
     }
   }
   return result;
+}
+
+// Whether a given category/section is actually visible under a computed
+// visibleSectionKeys map — same "empty array = every section of that
+// category stays visible" convention EmployeeRecordView's own filtering
+// already uses (RecordSection's own doc comment). Callers gating page
+// access (notFound() before ever rendering) should use this, not just check
+// `category in visibleSectionKeys` — a category can be present with a
+// non-empty array that doesn't include this specific section.
+export function isSectionVisible(
+  visibleSectionKeys: Record<string, string[]>,
+  categoryKey: string,
+  sectionKey: string,
+): boolean {
+  if (!(categoryKey in visibleSectionKeys)) return false;
+  const allowed = visibleSectionKeys[categoryKey];
+  return allowed.length === 0 || allowed.includes(sectionKey);
+}
+
+// ─── Role-based section restriction (2026-09-08, see conversation) ───
+//
+// Layered ON TOP of the stage-based visibility above, never replacing it —
+// each function here takes an already stage-filtered map and narrows it
+// further for a specific viewer/relationship. A category whose section list
+// becomes empty is dropped entirely (not kept as `[]`), since
+// visibleCategories' own `c.key in visibleSectionKeys` check only tests key
+// presence — an empty array would still render an empty, broken tab.
+// Composes with the stage functions above via plain narrowing (this can
+// only ever remove keys the stage map already had, never add any it
+// didn't) — the async resolver in employeeSectionAccess.ts decides WHICH of
+// these to call for a given viewer/subject pair; these stay pure and
+// synchronous so they're cheap to unit test directly.
+function filterVisibleSections(
+  stageMap: Record<string, string[]>,
+  shouldHide: (categoryKey: string, sectionKey: string) => boolean,
+): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
+  for (const [categoryKey, sectionKeys] of Object.entries(stageMap)) {
+    const kept = sectionKeys.filter((key) => !shouldHide(categoryKey, key));
+    if (kept.length > 0) result[categoryKey] = kept;
+  }
+  return result;
+}
+
+// Universal self-view rule — applies whenever viewer === subject, for EVERY
+// role including HR/CEO, and REPLACES the role-specific rules below entirely
+// rather than stacking with them (an HR person viewing their own profile
+// still loses Hiring Notes/Reference, but keeps Payroll/Tax Info/Disciplinary/
+// Medical Check, none of which self-view touches). Hiring Notes/Reference
+// are the interviewer's/referee's own private evaluation of the person —
+// showing them back to the subject discourages honest evaluation.
+export function applySelfViewRestriction(stageMap: Record<string, string[]>): Record<string, string[]> {
+  const HIDDEN_HR_INFO = new Set(["hiring-notes", "reference"]);
+  return filterVisibleSections(stageMap, (cat, key) => cat === "hr-info" && HIDDEN_HR_INFO.has(key));
+}
+
+// HR/Superadmin/is_full_access viewing someone ELSE (not self — see above).
+// Payroll/Tax Info moved to Finance's own domain, out of HR's. subjectIsHr
+// additionally hides Medical Check and all 4 Disciplinary sub-tabs — HR-on-HR
+// protection, so one HR colleague can't browse another's own sensitive file;
+// does not apply when the subject isn't HR, or when HR views their own
+// profile (handled entirely by applySelfViewRestriction instead).
+export function applyHrViewingOtherRestriction(
+  stageMap: Record<string, string[]>,
+  subjectIsHr: boolean,
+): Record<string, string[]> {
+  const HIDDEN_FINANCE = new Set(["payroll", "tax-info"]);
+  const HIDDEN_HR_INFO_IF_SUBJECT_HR = new Set(["medical-check"]);
+  const HIDDEN_DISCIPLINARY_IF_SUBJECT_HR = new Set(["domestic-inquiry", "suspension", "showcause", "pip"]);
+  return filterVisibleSections(stageMap, (cat, key) => {
+    if (cat === "finance" && HIDDEN_FINANCE.has(key)) return true;
+    if (subjectIsHr && cat === "hr-info" && HIDDEN_HR_INFO_IF_SUBJECT_HR.has(key)) return true;
+    if (subjectIsHr && cat === "disciplinary" && HIDDEN_DISCIPLINARY_IF_SUBJECT_HR.has(key)) return true;
+    return false;
+  });
+}
+
+// Finance (finance@ebright.my specifically — resolved by the caller, not
+// role_type, since Finance has no distinct role_type in this system) viewing
+// anyone else. ONLY Payroll/Tax Info and Offboarding's Financial Settlement
+// survive — every other category is hidden entirely, and Offboarding's other
+// 6 sub-tabs (Resignation/Reference Letter/Exit Interview Notes/Clearance's
+// 3) are hidden too, keeping only Financial Settlement from that category.
+export function applyFinanceRestriction(stageMap: Record<string, string[]>): Record<string, string[]> {
+  return filterVisibleSections(stageMap, (cat, key) => {
+    if (cat === "finance") return false; // keep both payroll + tax-info
+    if (cat === "offboarding") return key !== "financial-settlement"; // keep ONLY this one
+    return true; // every other category hidden entirely
+  });
+}
+
+// HOD (own department) / a real Branch Manager (own branch, role_type
+// "staff", position "BM") / role_type "od" (a generic department-or-branch
+// account, same tier per explicit correction, see conversation) / any other
+// role_type not named elsewhere in employeeSectionAccess.ts's resolver — all
+// share this one restriction. Payroll/Tax Info (not their function), Medical
+// Check (no operational need), and Reference/Hiring Notes (hiring-process
+// artifacts, not needed for ongoing team management) are hidden. Offboarding
+// stays fully visible (explicit decision, see conversation — relevant to
+// managing an exiting team member).
+export function applyHodTierRestriction(stageMap: Record<string, string[]>): Record<string, string[]> {
+  const HIDDEN_FINANCE = new Set(["payroll", "tax-info"]);
+  const HIDDEN_HR_INFO = new Set(["medical-check", "reference", "hiring-notes"]);
+  return filterVisibleSections(stageMap, (cat, key) => {
+    if (cat === "finance" && HIDDEN_FINANCE.has(key)) return true;
+    if (cat === "hr-info" && HIDDEN_HR_INFO.has(key)) return true;
+    return false;
+  });
+}
+
+// CEO viewing someone else. Coarse, all-or-nothing per explicit decision
+// (see conversation) — the current data model doesn't separate disciplinary
+// outcome from investigation detail, or fit-for-duty status from a full
+// medical report, so a more nuanced redaction isn't meaningful without new
+// fields; this hides both sections entirely rather than showing a
+// half-redacted version.
+export function applyCeoRestriction(stageMap: Record<string, string[]>): Record<string, string[]> {
+  return filterVisibleSections(stageMap, (cat, key) => {
+    if (cat === "disciplinary") return true;
+    if (cat === "hr-info" && key === "medical-check") return true;
+    return false;
+  });
 }

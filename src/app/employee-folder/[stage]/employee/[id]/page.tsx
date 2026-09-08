@@ -73,13 +73,13 @@ import { positionGroup } from "@/lib/employeeStages";
 import { STAGE_PROFILE_CONFIG, STAGE_PROCEED_BUTTON } from "@/lib/stageProfileConfig";
 import { getRealAccountLifecycleOverride, computePreStartDatePassedRows } from "@/lib/careerApplicationSync";
 import { getProbationDisplayInfo } from "@/lib/probationDecision";
+import { resolveEmployeeSectionRestriction } from "@/lib/employeeSectionAccess";
 import {
   PRE_VISIBLE_SECTIONS,
   PRE_NEW_SECTIONS,
-  probationVisibleSections,
-  probationNewSections,
   onboardingVisibleSections,
   onboardingNewSections,
+  probationStageNewSections,
   activeVisibleSections,
   activeNewSections,
   exitVisibleSections,
@@ -250,11 +250,18 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
     listGuardianInfo(numId),
     getPaymentInfo(numId),
     // HR Info > Doc / Finance > Tax Info (2026-08-26, see conversation) —
-    // relevant from Onboarding onward (cumulative through Active/Exit);
-    // skipped for Pre/Probation, same "only fetch what this stage can show"
-    // convention the rest of this Promise.all already follows.
-    stage === "onboarding" || isActiveOrExit ? getDocuments(numId) : Promise.resolve(undefined),
-    stage === "onboarding" || isActiveOrExit ? getPayrollInfo(numId) : Promise.resolve(undefined),
+    // relevant from Onboarding onward (cumulative through Active/Exit), and
+    // now Probation too (2026-09-08, see conversation — Probation shows
+    // Onboarding's own visibleSectionKeys, including "handbook"/"tax-info";
+    // this fetch condition has to match that section-visibility condition
+    // exactly, or documentsInfo/payrollInfo stay undefined while the section
+    // is visible, which fails the HR Info/Finance render gate below and
+    // falls the ENTIRE category — not just Doc/Tax Info, every sub-tab
+    // including Resume/CV — through to the generic "not wired up yet"
+    // placeholder. Skipped only for Pre now, same "only fetch what this
+    // stage can show" convention the rest of this Promise.all follows.
+    stage === "probation" || stage === "onboarding" || isActiveOrExit ? getDocuments(numId) : Promise.resolve(undefined),
+    stage === "probation" || stage === "onboarding" || isActiveOrExit ? getPayrollInfo(numId) : Promise.resolve(undefined),
     getProbationInfo(numId),
     // Needed whenever this page might show the Probation sub-tab: Probation
     // stage's own current view, or Onboarding/Active/Exit's read-only
@@ -366,15 +373,38 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
   // Onboarding/Active/Exit section URLs still resolve via
   // [section]/page.tsx as a vestigial fallback.
   if (stage === "pre" || stage === "probation" || stage === "onboarding" || isActiveOrExit) {
-    const visibleSectionKeys = isExit
+    // Probation now uses onboardingVisibleSections directly, same as
+    // Onboarding itself (2026-09-08, see conversation — Confirm on the
+    // Probation profile jumps straight to Active with no Onboarding step in
+    // between, so Onboarding's own content — the Doc tab and Finance > Tax
+    // Info — was never shown or filled in for Full Time people during
+    // Probation). Purely additive: decideProbationOutcome's Confirm action
+    // is untouched, still gated only on feedback text + role, not on these
+    // sections being filled in. This also matches normalizeStageForVisibility
+    // below, which already treated Probation as Onboarding-equivalent for
+    // the "what's new" (red dot) computation — this was the one place that
+    // equivalence hadn't been carried over to. probationVisibleSections
+    // (employeeVisibleSections.ts) is now unused — see its own comment.
+    const stageVisibleSectionKeys = isExit
       ? exitVisibleSections(isFullTime)
       : isActive
         ? activeVisibleSections(isFullTime)
         : stage === "pre"
           ? PRE_VISIBLE_SECTIONS
-          : stage === "probation"
-            ? probationVisibleSections(isFullTime)
-            : onboardingVisibleSections(isFullTime);
+          : onboardingVisibleSections(isFullTime);
+    // Role-based narrowing (2026-09-08, see conversation) — layered on top
+    // of the stage map above, never widening it; see
+    // employeeSectionAccess.ts for the full policy (self-view, HR-on-HR,
+    // Finance, HOD tier, CEO).
+    const visibleSectionKeys = await resolveEmployeeSectionRestriction(stageVisibleSectionKeys, employee.id);
+    // A role restriction can legitimately empty out the whole map (e.g.
+    // Finance viewing a Pre-stage candidate — Pre's own stage map has
+    // neither "finance" nor "offboarding" for Finance's restriction to keep
+    // anything from). EmployeeRecordView's "client" mode falls back to
+    // visibleCategories[0], which would be undefined here and crash — reject
+    // before ever rendering instead, same as the plain /employee-record/[id]
+    // page's own isSectionVisible guard (2026-09-08, see conversation).
+    if (Object.keys(visibleSectionKeys).length === 0) notFound();
     const stageLabel = isExit
       ? "Exit"
       : isActive
@@ -392,16 +422,29 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
     // here — see conversation for why that lives on the generic
     // /employee-record/[id] route instead). Same departmentName ?? branchName
     // precedence the "Branch/Dept · Position" line below already uses,
-    // paired with the matching *Code for the crumb's own link target — a
-    // Pre-stage candidate has neither (no location layer reaches here for
-    // them), so the crumb is simply omitted rather than a dead link.
+    // paired with the matching *Code for the crumb's own link target.
+    //
+    // Gated on STAGE_PROFILE_CONFIG[stage].hasLocationLayer (2026-09-08, see
+    // conversation — bug fix), not just on locationName/locationCode being
+    // present. Those two are about whether this EMPLOYEE has department/
+    // branch data, not whether this STAGE has a drill-down page to link to
+    // — they only agreed for Pre (no location layer AND no data yet, so the
+    // crumb happened to be correctly omitted, but only as an accidental side
+    // effect). Probation has real department data (already a real, located
+    // employee) but, per hasLocationLayer's own comment in
+    // stageProfileConfig.ts, "skip[s] the Branch/Department drill-down —
+    // flat list straight to profile", same as Pre — so the old code wrongly
+    // linked to a department namelist Probation doesn't actually have.
     const locationName = employeeDetail?.departmentName ?? employeeDetail?.branchName ?? null;
     const locationCode = employeeDetail?.departmentName ? employee.departmentCode : employee.branchCode;
     const locationGroupSegment = employeeDetail?.departmentName ? "department" : "branch";
+    const hasLocationLayer = STAGE_PROFILE_CONFIG[stage].hasLocationLayer;
     const breadcrumbMiddle = [
       { label: "Employee Overview", href: "/employee-folder" },
       { label: stageLabel, href: `/employee-folder/${stage}` },
-      ...(locationName && locationCode ? [{ label: locationName, href: `/employee-folder/${stage}/${locationGroupSegment}/${locationCode}` }] : []),
+      ...(hasLocationLayer && locationName && locationCode
+        ? [{ label: locationName, href: `/employee-folder/${stage}/${locationGroupSegment}/${locationCode}` }]
+        : []),
     ];
     const breadcrumbLabel = employee.fullName;
     // Red dot + default-tab (2026-08-26, see conversation) — newSectionKeys
@@ -409,6 +452,14 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
     // the ones still genuinely empty; the default category/sectionKey opens
     // straight on the first new section instead of Personal Info, falling
     // back to Personal Info when there's nothing new to prioritize.
+    // Probation gets its own new-section list (2026-09-08, see
+    // conversation) — probationStageNewSections() = ["probation", ...same
+    // Doc/Tax Info Onboarding already had], NOT onboardingNewSections()
+    // directly, since Onboarding's own page must never dot "probation" (see
+    // that function's own comment). "probation" first also makes it this
+    // profile's default-landing tab (firstNewSection uses newSectionKeys[0])
+    // — intentional. probationNewSections (the old, pre-unification
+    // function) is unused — see its own comment in employeeVisibleSections.ts.
     const newSectionKeys = isExit
       ? exitNewSections()
       : isActive
@@ -416,7 +467,7 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
         : stage === "pre"
           ? PRE_NEW_SECTIONS
           : stage === "probation"
-            ? probationNewSections(isFullTime)
+            ? probationStageNewSections()
             : onboardingNewSections();
     const dotSectionKeys = new Set(
       newSectionKeys.filter((key) =>
@@ -482,6 +533,17 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
           canEdit={canEdit}
           proceedButton={proceedButton}
           visibleSectionKeys={visibleSectionKeys}
+          // No sectionOrderFirst (2026-09-08, see conversation — reverted
+          // same-day) — briefly moved "Probation" first among HR Info's
+          // sub-tabs for the Probation stage, but the user asked for its
+          // position to match the real Employee Record page's own order
+          // instead (Resume/CV, Offer Letter, ..., Probation, ..., Doc —
+          // unchanged, same static EMPLOYEE_RECORD_CATEGORIES order as
+          // every other stage/page). Red dot + default-landing-tab behavior
+          // (probationStageNewSections, below) are unaffected by this —
+          // only the rail's visual order reverted. EmployeeRecordView.tsx's
+          // sectionOrderFirst prop/reorderSectionsFirst helper are left in
+          // place, unused, in case a future stage genuinely needs reordering.
           categoryNavigationMode="client"
           basePath={`/employee-folder/${stage}/employee/${employee.id}`}
           breadcrumbLabel={breadcrumbLabel}
