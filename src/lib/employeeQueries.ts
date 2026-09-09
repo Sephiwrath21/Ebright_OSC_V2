@@ -2205,10 +2205,26 @@ export async function listEmployeeTasks(userId: number): Promise<EmployeeTasksSu
   const user = await prisma.users.findUnique({ where: { user_id: userId }, select: { email: true } });
   if (!user?.email) return { pending: [], overdue: [] };
 
+  try {
+    return await listEmployeeTasksUnsafe(user.email);
+  } catch (err) {
+    // Fail open, same contract as every other Task Manager caller (see
+    // core.ts's native()/claim-gate.ts's own comment: no
+    // TASK_MANAGER_DATABASE_URL, or the database simply being down, must
+    // never take down the caller). Unlike those callers, this function had
+    // no try/catch at all — a Task Manager outage on any one environment
+    // meant this exact page 500'd instead of just showing an empty Task
+    // tab (2026-09-09, see conversation — staging bug fix).
+    console.error("[employeeQueries] listEmployeeTasks", err);
+    return { pending: [], overdue: [] };
+  }
+}
+
+async function listEmployeeTasksUnsafe(email: string): Promise<EmployeeTasksSummary> {
   // Task Manager's bootstrap normalizes every imported email to lowercase
   // (see hrfs-map.ts's mapHrfsUser) — match the same way here.
   const tmUser = await taskManagerPrisma.user.findUnique({
-    where: { email: user.email.trim().toLowerCase() },
+    where: { email: email.trim().toLowerCase() },
     select: { id: true },
   });
   if (!tmUser) return { pending: [], overdue: [] };
@@ -2316,6 +2332,17 @@ export async function getOverdueTaskCounts(userIds: number[]): Promise<Record<nu
   const users = await prisma.users.findMany({ where: { user_id: { in: userIds } }, select: { user_id: true, email: true } });
   if (users.length === 0) return {};
 
+  try {
+    return await getOverdueTaskCountsUnsafe(users);
+  } catch (err) {
+    // Fail open — same rationale as listEmployeeTasks above. A Task
+    // Manager outage must not take down the namelist page it decorates.
+    console.error("[employeeQueries] getOverdueTaskCounts", err);
+    return {};
+  }
+}
+
+async function getOverdueTaskCountsUnsafe(users: { user_id: number; email: string }[]): Promise<Record<number, number>> {
   const emailToUserId = new Map<string, number>();
   for (const u of users) emailToUserId.set(u.email.trim().toLowerCase(), u.user_id);
 
@@ -2380,6 +2407,19 @@ export async function listPendingOverdueTaskDetails(userIds: number[]): Promise<
   const users = await prisma.users.findMany({ where: { user_id: { in: userIds } }, select: { user_id: true, email: true } });
   if (users.length === 0) return {};
 
+  try {
+    return await listPendingOverdueTaskDetailsUnsafe(users);
+  } catch (err) {
+    // Fail open — same rationale as listEmployeeTasks above. A Task
+    // Manager outage must not take down the company-wide overview page.
+    console.error("[employeeQueries] listPendingOverdueTaskDetails", err);
+    return {};
+  }
+}
+
+async function listPendingOverdueTaskDetailsUnsafe(
+  users: { user_id: number; email: string }[],
+): Promise<Record<number, EmployeeTasksSummary>> {
   const emailToUserId = new Map<string, number>();
   for (const u of users) emailToUserId.set(u.email.trim().toLowerCase(), u.user_id);
 
