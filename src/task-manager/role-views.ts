@@ -354,6 +354,10 @@ export const EXTRA_TEMPLATE_GROUP_EDITOR_EMAILS: readonly string[] = [
   // Wan Nuraihan Hanisah Binti Wan Abdul Hadi — Optimisation dept exec
   // (role MEMBER, so she doesn't otherwise qualify) — 2026-08-22 request.
   "nuraihanhanisah2002@gmail.com",
+  // jothi2703@gmail.com — Operations HOD; role already grants View, this
+  // adds Edit (HOD isn't otherwise in the edit-permission role set) —
+  // 2026-09-09 request.
+  "jothi2703@gmail.com",
 ];
 
 /** Task Manager Template/Package/Package Table EDIT capability
