@@ -312,6 +312,20 @@ interface Props {
    *  someone else's record, where the server-side guard already blocks the save.
    *  Defaults true so this stays a no-op unless a caller opts in. */
   canEdit?: boolean;
+  /** Whether the CURRENT viewer is HR/Superadmin (2026-09-08, see
+   *  conversation — bug fix) — gates Disciplinary/Medical Check/Payroll/Tax
+   *  Info/NDA-NC's own Edit/Save/+Add controls specifically, on top of (never
+   *  instead of) `canEdit` above: `canEdit` alone used to let anyone editing
+   *  their own profile (or otherwise in scope) see and click these controls,
+   *  which then always failed server-side against
+   *  employeeRecordActions.ts's requireHrOrSuperadmin() guards — correct
+   *  outcome, wrong UX (a control that always 403s shouldn't render at all).
+   *  Every OTHER section (Personal Info, Resume/CV, Offer Letter, Doc, etc.)
+   *  is unaffected — still gated on `canEdit` alone, exactly as before.
+   *  Defaults false (fail closed, not fail open) so a caller that forgets to
+   *  pass this gets the SAFER behavior (controls hidden), not the
+   *  pre-this-fix behavior (controls shown to everyone). */
+  viewerIsHrOrSuperadmin?: boolean;
   /** Restricts which categories/sections render (2026-08-26, see
    *  conversation) — e.g. Pre stage's embedded usage, which only shows
    *  Personal Info (Personal Info + Guardian Info) and HR Info (Resume/
@@ -443,6 +457,7 @@ export default function EmployeeRecordView({
   financialSettlement,
   canAddChecklistItem,
   canEdit = true,
+  viewerIsHrOrSuperadmin = false,
   visibleSectionKeys,
   sectionOrderFirst,
   categoryNavigationMode = "route",
@@ -483,6 +498,11 @@ export default function EmployeeRecordView({
         return sections === c.sections ? c : { ...c, sections };
       })
     : EMPLOYEE_RECORD_CATEGORIES;
+  // Disciplinary/Medical Check/Payroll/Tax Info/NDA-NC's own canEdit
+  // (2026-09-08, see conversation — bug fix, see viewerIsHrOrSuperadmin's
+  // own doc comment above): never MORE permissive than canEdit itself, only
+  // ever narrower.
+  const hrOnlyCanEdit = canEdit && viewerIsHrOrSuperadmin;
   const tabSize = CAT_TAB_SIZE;
   const [activeCategoryKey, setActiveCategoryKey] = useState(category.key);
   // "route" mode's fallback used to be `?? category` (the raw, unfiltered
@@ -988,7 +1008,7 @@ export default function EmployeeRecordView({
                     )}
                     {hrSections.has("medical-check") && medicalCheck !== undefined && (
                       <div className={currentSection.key === "medical-check" ? "" : "hidden"}>
-                        <MedicalCheckPanel userId={employeeId} data={medicalCheck} canEdit={canEdit} />
+                        <MedicalCheckPanel userId={employeeId} data={medicalCheck} canEdit={hrOnlyCanEdit} />
                       </div>
                     )}
                     {hrSections.has("probation") && probationInfo !== undefined && probationDisplay && (
@@ -1004,7 +1024,7 @@ export default function EmployeeRecordView({
                     )}
                     {hrSections.has("nda-nc") && ndaInfo !== undefined && nonCompeteInfo !== undefined && (
                       <div className={currentSection.key === "nda-nc" ? "" : "hidden"}>
-                        <NdaNcPanel userId={employeeId} ndaData={ndaInfo} nonCompeteData={nonCompeteInfo} canEdit={canEdit} />
+                        <NdaNcPanel userId={employeeId} ndaData={ndaInfo} nonCompeteData={nonCompeteInfo} canEdit={hrOnlyCanEdit} />
                       </div>
                     )}
                     {hrSections.has("handbook") && documentsInfo !== undefined && (
@@ -1043,7 +1063,17 @@ export default function EmployeeRecordView({
                   (!financeSections.has("tax-info") || payrollInfo !== undefined)
                 ) {
                   return (
-                    <PageEditProvider canEdit={canEdit}>
+                    // hrOnlyCanEdit on the provider itself (2026-09-08, see
+                    // conversation — bug fix), not just canEdit — unlike HR
+                    // Info's shared provider (which mixes restricted and
+                    // unrestricted sections, so only individual panels'
+                    // canEdit is narrowed there), EVERY section Finance has
+                    // is HR/Superadmin-only, so gating the provider directly
+                    // correctly hides the whole category's single shared Edit
+                    // button for anyone else, rather than leaving a
+                    // technically-clickable button that could never do
+                    // anything.
+                    <PageEditProvider canEdit={hrOnlyCanEdit}>
                       <PageEditMessageDialog />
                       <div className="mb-4 flex justify-end">
                         <PageEditToggleButton />
@@ -1058,7 +1088,7 @@ export default function EmployeeRecordView({
                               salaryRevisions={salaryRevisions}
                               payslip={payslip}
                               payslipHistory={payslipHistory}
-                              canEdit={canEdit}
+                              canEdit={hrOnlyCanEdit}
                             />
                           </div>
                         )}
@@ -1070,7 +1100,7 @@ export default function EmployeeRecordView({
                             employeeDetail={employeeDetail}
                             heading="Tax Info"
                             showBankDetails={false}
-                            canEdit={canEdit}
+                            canEdit={hrOnlyCanEdit}
                           />
                         </div>
                       )}
@@ -1103,7 +1133,16 @@ export default function EmployeeRecordView({
                 achievements !== undefined
               ) {
                 return (
-                  <PageEditProvider canEdit={canEdit}>
+                  // hrOnlyCanEdit on the provider itself (2026-09-08, see
+                  // conversation — bug fix), not just canEdit — no mixing to
+                  // worry about here (unlike HR Info's shared provider):
+                  // Leave never had a canEdit/edit concept at all (LeavePanel
+                  // takes no such prop, purely read-only), and the other 5
+                  // sections in this batch are now ALL HR/Superadmin-only, so
+                  // gating the provider directly correctly hides the whole
+                  // shared Edit button for anyone else, same reasoning as
+                  // Finance's identical case above.
+                  <PageEditProvider canEdit={hrOnlyCanEdit}>
                     <PageEditMessageDialog />
                     {/* Leave has no Edit/Save concept at all (see conversation)
                         -- hide the shared toggle while that sub-tab is showing,
@@ -1117,13 +1156,13 @@ export default function EmployeeRecordView({
                       <LeavePanel rows={leaveHistory} />
                     </div>
                     <div className={currentSection.key === "performance-review" ? "" : "hidden"}>
-                      <PerformanceReviewPanel userId={employeeId} data={performanceReview} canEdit={canEdit} />
+                      <PerformanceReviewPanel userId={employeeId} data={performanceReview} canEdit={hrOnlyCanEdit} />
                     </div>
                     <div className={currentSection.key === "training" ? "" : "hidden"}>
-                      <TrainingPanel userId={employeeId} data={trainings} canEdit={canEdit} />
+                      <TrainingPanel userId={employeeId} data={trainings} canEdit={hrOnlyCanEdit} />
                     </div>
                     <div className={currentSection.key === "promotion" ? "" : "hidden"}>
-                      <PromotionPanel userId={employeeId} data={promotions} currentPosition={position} canEdit={canEdit} />
+                      <PromotionPanel userId={employeeId} data={promotions} currentPosition={position} canEdit={hrOnlyCanEdit} />
                     </div>
                     <div className={currentSection.key === "transfer" ? "" : "hidden"}>
                       <TransferPanel
@@ -1132,11 +1171,11 @@ export default function EmployeeRecordView({
                         branches={branches ?? []}
                         departments={departments ?? []}
                         currentLocation={departmentName ?? branchName}
-                        canEdit={canEdit}
+                        canEdit={hrOnlyCanEdit}
                       />
                     </div>
                     <div className={currentSection.key === "cert" ? "" : "hidden"}>
-                      <AchievementPanel userId={employeeId} data={achievements} canEdit={canEdit} />
+                      <AchievementPanel userId={employeeId} data={achievements} canEdit={hrOnlyCanEdit} />
                     </div>
                   </PageEditProvider>
                 );
@@ -1210,14 +1249,16 @@ export default function EmployeeRecordView({
               // clientSection state, not a fresh sectionKey per navigation;
               // currentSection.key already resolves to whichever of the two
               // applies (see its own derivation above).
+              // hrOnlyCanEdit for all 4 (2026-09-08, see conversation — bug
+              // fix) — every Disciplinary sub-tab is HR/Superadmin-only.
               if (currentCategory.key === "disciplinary" && currentSection.key === "domestic-inquiry" && domesticInquiries !== undefined)
-                return <DomesticInquiryPanel userId={employeeId} data={domesticInquiries} canEdit={canEdit} />;
+                return <DomesticInquiryPanel userId={employeeId} data={domesticInquiries} canEdit={hrOnlyCanEdit} />;
               if (currentCategory.key === "disciplinary" && currentSection.key === "suspension" && suspensionLetters !== undefined)
-                return <SuspensionPanel userId={employeeId} data={suspensionLetters} canEdit={canEdit} />;
+                return <SuspensionPanel userId={employeeId} data={suspensionLetters} canEdit={hrOnlyCanEdit} />;
               if (currentCategory.key === "disciplinary" && currentSection.key === "showcause" && showcauseWarningLetters !== undefined)
-                return <ShowcausePanel userId={employeeId} data={showcauseWarningLetters} canEdit={canEdit} />;
+                return <ShowcausePanel userId={employeeId} data={showcauseWarningLetters} canEdit={hrOnlyCanEdit} />;
               if (currentCategory.key === "disciplinary" && currentSection.key === "pip" && pips !== undefined)
-                return <PipPanel userId={employeeId} data={pips} canEdit={canEdit} />;
+                return <PipPanel userId={employeeId} data={pips} canEdit={hrOnlyCanEdit} />;
               // currentSection.key, not the raw sectionKey prop — same
               // reasoning as Disciplinary's own identical fix above (Task is
               // now a CLIENT_TAB_CATEGORIES member too).

@@ -260,6 +260,23 @@ export function newSectionsForStage(stage: EmployeeStage): string[] {
   return exitNewSections();
 }
 
+// Moved here from [category]/[section]/page.tsx's own local helper
+// (2026-09-08, see conversation — bug fix) — the /employee-record/[id]
+// redirect shim needs this exact same stage-based visible-section map to
+// compute a role-aware default landing target, not just newSectionsForStage
+// above (which only lists what's NEW, not everything visible — not enough
+// to fall back into when nothing "new" survives a role restriction). Kept
+// out of either page.tsx file for the same reason newSectionsForStage
+// already was: Next.js route modules importing each other for internal
+// helpers is fragile.
+export function visibleSectionsForStage(stage: EmployeeStage, isFullTime: boolean): Record<string, string[]> {
+  const normalized = normalizeStageForVisibility(stage);
+  if (normalized === "pre") return PRE_VISIBLE_SECTIONS;
+  if (normalized === "onboarding") return onboardingVisibleSections(isFullTime);
+  if (normalized === "active") return activeVisibleSections(isFullTime);
+  return exitVisibleSections(isFullTime);
+}
+
 /** Per-section "is this genuinely empty" check (2026-08-26, see
  *  conversation) — deliberately narrow: only section keys that can ever
  *  appear in *NewSections above are handled; anything else returns false
@@ -385,6 +402,43 @@ export function isSectionVisible(
   return allowed.length === 0 || allowed.includes(sectionKey);
 }
 
+// Every section key visible anywhere in a computed visibleSectionKeys map,
+// flattened across categories — same "empty array = every section of that
+// category" expansion isSectionVisible/entirelyNewCategories already use.
+// Used to filter a flat "what's new" list (newSectionsForStage) down to
+// only what a role-restricted view actually allows, before picking a
+// default landing section (see firstVisibleSection below and the
+// /employee-record/[id] redirect shim, 2026-09-08 — bug fix).
+export function allVisibleSectionKeysFlat(visibleSectionKeys: Record<string, string[]>): Set<string> {
+  const flat = new Set<string>();
+  for (const [categoryKey, allowed] of Object.entries(visibleSectionKeys)) {
+    const keys = allowed.length > 0 ? allowed : (findRecordCategory(categoryKey)?.sections.map((s) => s.key) ?? []);
+    for (const key of keys) flat.add(key);
+  }
+  return flat;
+}
+
+// The first genuinely visible category/section under a computed
+// visibleSectionKeys map, in EMPLOYEE_RECORD_CATEGORIES' own canonical
+// order (2026-09-08, see conversation — bug fix) — the fallback the
+// /employee-record/[id] redirect shim uses when nothing in the stage's own
+// "what's new" list survives a role restriction (e.g. Finance: nothing in
+// Active's newSectionKeys is Finance-visible, so this picks
+// finance/payroll — the first section of the first category Finance's own
+// restricted map actually has anything in, per EMPLOYEE_RECORD_CATEGORIES'
+// fixed personal-info/hr-info/finance/... order). Returns null only if the
+// map is empty (nothing visible at all) — callers fall back further from
+// there themselves.
+export function firstVisibleSection(visibleSectionKeys: Record<string, string[]>): { categoryKey: string; sectionKey: string } | null {
+  for (const category of EMPLOYEE_RECORD_CATEGORIES) {
+    if (!(category.key in visibleSectionKeys)) continue;
+    const allowed = visibleSectionKeys[category.key];
+    const first = category.sections.find((s) => allowed.length === 0 || allowed.includes(s.key));
+    if (first) return { categoryKey: category.key, sectionKey: first.key };
+  }
+  return null;
+}
+
 // ─── Role-based section restriction (2026-09-08, see conversation) ───
 //
 // Layered ON TOP of the stage-based visibility above, never replacing it —
@@ -464,14 +518,20 @@ export function applyFinanceRestriction(stageMap: Record<string, string[]>): Rec
 // share this one restriction. Payroll/Tax Info (not their function), Medical
 // Check (no operational need), and Reference/Hiring Notes (hiring-process
 // artifacts, not needed for ongoing team management) are hidden. Offboarding
-// stays fully visible (explicit decision, see conversation — relevant to
-// managing an exiting team member).
+// is now hidden entirely too (2026-09-09, see conversation — reversed the
+// earlier "stays fully visible" decision above; superseded, not deleted, so
+// the history of why it was originally kept visible stays legible) — paired
+// with requireNotHodTierViewingSomeoneElse in employeeRecordActions.ts,
+// which makes HOD/BM fully view-only for anyone but themselves, so there's
+// no longer an "editing an exiting team member" use case this visibility
+// was serving.
 export function applyHodTierRestriction(stageMap: Record<string, string[]>): Record<string, string[]> {
   const HIDDEN_FINANCE = new Set(["payroll", "tax-info"]);
   const HIDDEN_HR_INFO = new Set(["medical-check", "reference", "hiring-notes"]);
   return filterVisibleSections(stageMap, (cat, key) => {
     if (cat === "finance" && HIDDEN_FINANCE.has(key)) return true;
     if (cat === "hr-info" && HIDDEN_HR_INFO.has(key)) return true;
+    if (cat === "offboarding") return true;
     return false;
   });
 }

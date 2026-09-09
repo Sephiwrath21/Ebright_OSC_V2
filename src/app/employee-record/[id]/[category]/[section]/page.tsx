@@ -48,36 +48,17 @@ import { getRealAccountLifecycleOverride } from "@/lib/careerApplicationSync";
 import { getProbationDisplayInfo } from "@/lib/probationDecision";
 import { canEditProfile } from "@/lib/employeeRecordActions";
 import { getCurrentEmployeeScope } from "@/lib/employeeScope";
-import { resolveEmployeeSectionRestriction } from "@/lib/employeeSectionAccess";
+import { resolveEmployeeSectionRestriction, isCurrentViewerHrOrSuperadmin } from "@/lib/employeeSectionAccess";
 import {
-  PRE_VISIBLE_SECTIONS,
-  onboardingVisibleSections,
-  activeVisibleSections,
-  exitVisibleSections,
   isSectionEmpty,
   entirelyNewCategories,
   normalizeStageForVisibility,
   newSectionsForStage,
   isSectionVisible,
+  visibleSectionsForStage,
 } from "@/lib/employeeVisibleSections";
 
 export const dynamic = "force-dynamic";
-
-// Employee Record's own effective-stage resolution (2026-08-27, see
-// conversation) — reuses the exact same override lookup the stage-folder
-// pages already use (getRealAccountLifecycleOverride), not a separate
-// re-derivation. normalizeStageForVisibility/newSectionsForStage moved into
-// employeeVisibleSections.ts (2026-08-28, see conversation) so the
-// /employee-record/[id] redirect shim can share the exact same "what's new"
-// computation for its own default-landing-section logic, instead of a second
-// re-derivation drifting out of sync with this one.
-function visibleSectionsForStage(stage: EmployeeStage, isFullTime: boolean): Record<string, string[]> {
-  const normalized = normalizeStageForVisibility(stage);
-  if (normalized === "pre") return PRE_VISIBLE_SECTIONS;
-  if (normalized === "onboarding") return onboardingVisibleSections(isFullTime);
-  if (normalized === "active") return activeVisibleSections(isFullTime);
-  return exitVisibleSections(isFullTime);
-}
 
 interface Props {
   params: Promise<{ id: string; category: string; section: string }>;
@@ -336,6 +317,11 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
   // checklists — same role check every other Clearance/Probation
   // "+ Add"/decision gate in this app already uses.
   const canAddChecklistItem = ["hr", "superadmin"].includes(userRole.toLowerCase());
+  // Gates Disciplinary/Medical Check/Payroll/Tax Info/NDA-NC's own Edit/
+  // Save/+Add controls specifically (2026-09-08, see conversation — bug
+  // fix) — a fresh DB lookup, same freshness reasoning as canEdit above, not
+  // canAddChecklistItem's session.user.role (kept as-is, out of scope here).
+  const viewerIsHrOrSuperadmin = await isCurrentViewerHrOrSuperadmin();
 
   // Breadcrumb (2026-08-28, see conversation) — this route is never reached
   // via the Employee Overview -> stage -> branch/department drill-down
@@ -357,6 +343,7 @@ export default async function EmployeeRecordSectionPage({ params }: Props) {
       <EmployeeRecordView
         employeeId={employee.id}
         canEdit={canEdit}
+        viewerIsHrOrSuperadmin={viewerIsHrOrSuperadmin}
         employeeName={employee.fullName}
         category={cat}
         sectionKey={section}

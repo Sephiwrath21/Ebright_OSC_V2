@@ -73,7 +73,7 @@ import { positionGroup } from "@/lib/employeeStages";
 import { STAGE_PROFILE_CONFIG, STAGE_PROCEED_BUTTON } from "@/lib/stageProfileConfig";
 import { getRealAccountLifecycleOverride, computePreStartDatePassedRows } from "@/lib/careerApplicationSync";
 import { getProbationDisplayInfo } from "@/lib/probationDecision";
-import { resolveEmployeeSectionRestriction } from "@/lib/employeeSectionAccess";
+import { resolveEmployeeSectionRestriction, isCurrentViewerHrOrSuperadmin } from "@/lib/employeeSectionAccess";
 import {
   PRE_VISIBLE_SECTIONS,
   PRE_NEW_SECTIONS,
@@ -337,6 +337,11 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
   // are only as fresh as the JWT was at login time, so a session issued
   // before this account's role existed would silently fail open.
   const canEdit = await canEditProfile(employee.id);
+  // Gates Disciplinary/Medical Check/Payroll/Tax Info/NDA-NC's own Edit/
+  // Save/+Add controls specifically (2026-09-08, see conversation — bug
+  // fix), on top of canEdit above, not instead of it — see
+  // viewerIsHrOrSuperadmin's own doc comment in EmployeeRecordView.tsx.
+  const viewerIsHrOrSuperadmin = await isCurrentViewerHrOrSuperadmin();
 
   // "Proceed"/"Next"/"Exit" advance-to-next-stage button (2026-08-28, see
   // conversation) — ported from StageProfileView.tsx's own original
@@ -531,6 +536,7 @@ export default async function EmployeeFolderProfilePage({ params, searchParams }
           // glance at an earlier one).
           canDecideProbation={stage === "probation" ? canDecideProbation : false}
           canEdit={canEdit}
+          viewerIsHrOrSuperadmin={viewerIsHrOrSuperadmin}
           proceedButton={proceedButton}
           visibleSectionKeys={visibleSectionKeys}
           // No sectionOrderFirst (2026-09-08, see conversation — reverted

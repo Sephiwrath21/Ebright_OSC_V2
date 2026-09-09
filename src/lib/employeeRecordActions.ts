@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { uploadToDrive, deleteFromDrive, resolveEmployeeFolderId } from "@/lib/drive";
 import { getCurrentEmployeeScope, isRowInScope } from "@/lib/employeeScope";
+import { isHodTierViewingSomeoneElse } from "@/lib/employeeSectionAccess";
 import { STAFF_ROLE_ID, getEmployeeOverviewRowById, listBranches, listDepartments, resolveDepartmentBranch } from "@/lib/employeeQueries";
 import { positionGroup } from "@/lib/employeeStages";
 import { resolveNewProbationEndDate } from "@/lib/probationDecision";
@@ -38,7 +39,29 @@ async function requireNotCeoUnlessOwnProfile(userId?: number): Promise<ActionRes
   return { ok: false, error: "CEO accounts can only edit their own profile." };
 }
 
-// UI-side mirror of the check above, as a plain boolean for gating whether a
+// HOD/real Branch Manager/"od"/unlisted-role_type accounts are fully
+// view-only for anyone but themselves (2026-09-09, see conversation — new
+// feature, same "own profile only" shape as requireNotCeoUnlessOwnProfile
+// above, just for a different role tier and a different reason: CEO is
+// permanently view-only everywhere by design, HOD/BM instead used to have
+// normal scope-based edit access and had it explicitly revoked). userId
+// omitted entirely (addPreStageEmployee's create-a-new-employee case) always
+// blocks HOD-tier the same way requireNotCeoUnlessOwnProfile does, since
+// there's no existing row that could be "their own" either. Every other
+// role passes through immediately, unaffected.
+async function requireNotHodTierViewingSomeoneElse(userId?: number): Promise<ActionResult | null> {
+  // -1 as the sentinel for "no existing row" (userId omitted): never a real
+  // users.user_id (positive) or a real onboarding_candidate negative
+  // sentinel (-source_id, only ever queried inside classifyViewerRelationship's
+  // "hr" branch, which -1 harmlessly misses too) — classifyViewerRelationship's
+  // own `me.user_id === subjectUserId` self-check can never match it, so this
+  // always resolves as "not self", exactly the "always blocks" intent.
+  const isBlocked = await isHodTierViewingSomeoneElse(userId ?? -1);
+  if (!isBlocked) return null;
+  return { ok: false, error: "You can only view this employee's record — editing is limited to HR/Superadmin." };
+}
+
+// UI-side mirror of the checks above, as a plain boolean for gating whether a
 // profile page even shows the Edit affordance (2026-08-28, see conversation)
 // — deliberately a FRESH DB lookup, not the session JWT's own cached
 // role/id. The 3 profile-page callers previously read `session.user.role`/
@@ -49,8 +72,14 @@ async function requireNotCeoUnlessOwnProfile(userId?: number): Promise<ActionRes
 // Reusing requireNotCeoUnlessOwnProfile here keeps this in one place and
 // means the display always reflects the CURRENT database role, matching
 // exactly what the underlying server action would actually allow.
+// requireNotHodTierViewingSomeoneElse added alongside it (2026-09-09, see
+// conversation) — same reasoning, now also covering HOD/BM's own new
+// view-only-for-others rule, so their Edit/Save buttons stop rendering on
+// Personal Info/Resume/Offer Letter/Doc for someone else's profile instead
+// of rendering and then always failing server-side.
 export async function canEditProfile(viewedUserId: number): Promise<boolean> {
-  return (await requireNotCeoUnlessOwnProfile(viewedUserId)) === null;
+  if ((await requireNotCeoUnlessOwnProfile(viewedUserId)) !== null) return false;
+  return (await requireNotHodTierViewingSomeoneElse(viewedUserId)) === null;
 }
 
 // Every mutation below targets a specific employee (userId, always the first
@@ -68,6 +97,19 @@ async function requireEmployeeInScope(userId: number): Promise<ActionResult | nu
   // any employee's record. This blocks that regardless of scope.
   const ceoError = await requireNotCeoUnlessOwnProfile(userId);
   if (ceoError) return ceoError;
+
+  // HOD/real Branch Manager/"od"/unlisted-role_type accounts are fully
+  // view-only for anyone but themselves (2026-09-09, see conversation — new
+  // feature). Checked here, the one gate every write action already calls,
+  // rather than adding this to each of the ~50 write functions individually
+  // — same reasoning as the CEO check just above, just for a different role
+  // tier. HOD/BM never have scope.fullAccess=true (unlike CEO), so this
+  // would eventually be caught by the ordinary department/branch scope
+  // check below too for someone OUTSIDE their department/branch — but NOT
+  // for someone INSIDE it, which is exactly the case this new rule needs to
+  // additionally block that the plain scope check alone would still allow.
+  const hodTierError = await requireNotHodTierViewingSomeoneElse(userId);
+  if (hodTierError) return hodTierError;
 
   const target = await prisma.users.findUnique({
     where: { user_id: userId },
@@ -110,15 +152,26 @@ async function requireEmployeeInScope(userId: number): Promise<ActionResult | nu
 // reused as-is (same role check, generic error message) for Exit >
 // Clearance's "add a new checklist item beyond the fixed 5" gate, per
 // explicit instruction not to invent a second HR-only check.
+// is_full_access included alongside role_type "hr"/"superadmin" (2026-09-08,
+// see conversation — bug fix, found while wiring up the matching UI-side
+// visibility check): the real hr@ebright.my account's role_type is actually
+// "department" (confirmed live), with is_full_access=true independently
+// granting it full view access everywhere else in this app (same fact
+// employeeScope.ts's own FULL_ACCESS_ROLE_TYPES + is_full_access check
+// already relies on). Without this, requireHrOrSuperadmin's role_type-only
+// check would reject the real HR account from every one of Phase 1's 22
+// guarded write actions — the account meant to be the primary user of all of
+// them.
 async function requireHrOrSuperadmin(): Promise<ActionResult | null> {
   const session = await auth();
   if (!session?.user?.email) return { ok: false, error: "Not signed in." };
   const me = await prisma.users.findUnique({
     where: { email: session.user.email },
-    select: { role: { select: { role_type: true } } },
+    select: { is_full_access: true, role: { select: { role_type: true } } },
   });
   const roleType = me?.role?.role_type?.toLowerCase();
-  if (roleType !== "hr" && roleType !== "superadmin") {
+  const isHrOrSuperadmin = me?.is_full_access || roleType === "hr" || roleType === "superadmin";
+  if (!isHrOrSuperadmin) {
     return { ok: false, error: "Only HR or Superadmin accounts can perform this action." };
   }
   return null;
@@ -789,6 +842,8 @@ export async function addAchievement(userId: number, input: AddAchievementInput)
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     let attachmentFileId: string | null = null;
     if (input.attachmentFile) {
@@ -873,6 +928,8 @@ export async function addPromotion(userId: number, input: AddPromotionInput): Pr
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     let attachmentFileId: string | null = null;
     if (input.attachmentFile) {
@@ -936,6 +993,8 @@ export async function addTransfer(userId: number, input: AddTransferInput): Prom
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   const isTemporary = input.type === "Temporary Transfer";
   if (isTemporary && !input.endDate) {
     return { ok: false, error: "End Date is required for a Temporary Transfer." };
@@ -1007,6 +1066,8 @@ export async function addTraining(userId: number, input: AddTrainingInput): Prom
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     await prisma.training.create({
       data: {
@@ -1716,6 +1777,8 @@ export async function updateAchievement(userId: number, id: number, input: AddAc
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const existing = await prisma.achievement.findUnique({ where: { achievement_id: id } });
     if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
@@ -1745,6 +1808,8 @@ export async function updatePromotion(userId: number, id: number, input: AddProm
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const existing = await prisma.promotion.findUnique({ where: { promotion_id: id } });
     if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
@@ -1806,6 +1871,8 @@ export async function updateTransfer(userId: number, id: number, input: AddTrans
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   const isTemporary = input.type === "Temporary Transfer";
   if (isTemporary && !input.endDate) {
     return { ok: false, error: "End Date is required for a Temporary Transfer." };
@@ -1880,6 +1947,8 @@ export async function updateTraining(userId: number, id: number, input: AddTrain
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const existing = await prisma.training.findUnique({ where: { training_id: id } });
     if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
@@ -2089,6 +2158,8 @@ export async function updatePerformanceReview(userId: number, id: number, input:
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const existing = await prisma.performance_review.findUnique({ where: { performance_review_id: id } });
     if (!existing || existing.user_id !== userId) return { ok: false, error: "Record not found." };
@@ -2131,6 +2202,8 @@ export async function deleteAchievement(userId: number, id: number): Promise<Act
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const row = await prisma.achievement.findUnique({ where: { achievement_id: id } });
     if (!row || row.user_id !== userId) return { ok: false, error: "Record not found." };
@@ -2165,6 +2238,8 @@ export async function deletePromotion(userId: number, id: number): Promise<Actio
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const row = await prisma.promotion.findUnique({ where: { promotion_id: id } });
     if (!row || row.user_id !== userId) return { ok: false, error: "Record not found." };
@@ -2181,6 +2256,8 @@ export async function deleteTransfer(userId: number, id: number): Promise<Action
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const row = await prisma.transfer.findUnique({ where: { transfer_id: id } });
     if (!row || row.user_id !== userId) return { ok: false, error: "Record not found." };
@@ -2197,6 +2274,8 @@ export async function deleteTraining(userId: number, id: number): Promise<Action
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const row = await prisma.training.findUnique({ where: { training_id: id } });
     if (!row || row.user_id !== userId) return { ok: false, error: "Record not found." };
@@ -2398,6 +2477,8 @@ export async function addPerformanceReview(userId: number, input: AddPerformance
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     let attachmentFileId: string | null = null;
     if (input.attachmentFile) {
@@ -2429,6 +2510,8 @@ export async function deletePerformanceReview(userId: number, id: number): Promi
   if (authError) return authError;
   const scopeError = await requireEmployeeInScope(userId);
   if (scopeError) return scopeError;
+  const hrError = await requireHrOrSuperadmin();
+  if (hrError) return hrError;
   try {
     const row = await prisma.performance_review.findUnique({ where: { performance_review_id: id } });
     if (!row || row.user_id !== userId) return { ok: false, error: "Record not found." };

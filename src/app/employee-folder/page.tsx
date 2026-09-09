@@ -5,6 +5,7 @@ import EmployeeOverviewView from "@/app/components/EmployeeOverviewView";
 import { getCurrentEmployeeScope } from "@/lib/employeeScope";
 import { getEmployeeOverviewData } from "@/lib/careerApplicationSync";
 import { prisma } from "@/lib/prisma";
+import { FINANCE_EMAIL } from "@/app/claim/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +51,31 @@ export default async function EmployeeFolderPage() {
   });
   const ceoOwnUserId = me?.role?.role_type?.toLowerCase() === "ceo" ? me.user_id : null;
 
+  // Finance's "Own Department" default view (2026-09-09, see conversation —
+  // new feature) — Finance's row-level scope is fullAccess (company-wide,
+  // no departmentCode set — see employeeScope.ts's own exact-email branch),
+  // so unlike a real department account there's no scope.departmentCode to
+  // reuse here; this is a separate, one-off lookup of Finance's own active
+  // employment's department, used only to seed EmployeeOverviewView's
+  // client-side "Own Department" filter default. isFinanceAccount gates
+  // whether the toggle renders at all — every other role is unaffected.
+  const isFinanceAccount = userEmail.trim().toLowerCase() === FINANCE_EMAIL.trim().toLowerCase();
+  let financeOwnDepartmentCode: string | null = null;
+  if (isFinanceAccount) {
+    const financeUser = await prisma.users.findUnique({
+      where: { email: userEmail },
+      select: {
+        employment: {
+          where: { status: "active" },
+          include: { department: true },
+          orderBy: { employment_id: "desc" },
+          take: 1,
+        },
+      },
+    });
+    financeOwnDepartmentCode = financeUser?.employment[0]?.department?.department_code ?? null;
+  }
+
   return (
     <AppShell email={userEmail} role={userRole} name={userName}>
       <EmployeeOverviewView
@@ -59,6 +85,8 @@ export default async function EmployeeFolderPage() {
         overdueTaskCounts={overdueTaskCounts}
         probationReminderNames={probationReminders.map((r) => ({ name: r.fullName, endDate: r.endDate }))}
         ceoOwnUserId={ceoOwnUserId}
+        isFinanceAccount={isFinanceAccount}
+        financeOwnDepartmentCode={financeOwnDepartmentCode}
       />
     </AppShell>
   );
