@@ -2103,10 +2103,24 @@ export interface EmployeeTaskRow {
   id: string;
   name: string;
   dueDate: string | null;
-  /** due_date < today (strictly before, not <=) and not completed — same
-   *  rule as the overdue query itself, also exposed per-row so the Pending
-   *  tab can highlight the subset of pending tasks that are also overdue. */
+  /** due_date < today (strictly before, not <=) AND cadence isn't "DAILY",
+   *  and not completed — drives which BUCKET (pending vs overdue) this row
+   *  is placed in. Daily tasks have no real deadline concept (2026-09-09,
+   *  see conversation — bug fix): a Daily task recurs weekly regardless of
+   *  whether the previous occurrence was ever completed, so treating a
+   *  missed one as "overdue" the way a real one-shot Monthly/Adhoc deadline
+   *  is would be wrong — it should stay Pending forever until done. See
+   *  isPastDue below for the separate "should this render as late" flag,
+   *  which Daily tasks CAN still be true for. */
   isOverdue: boolean;
+  /** due_date < today (strictly before, not <=) and not completed —
+   *  cadence-independent, unlike isOverdue above. Drives the red "this is
+   *  late" text styling on both the Employee Task tab and the admin
+   *  drilldown modal — TRUE for a Daily task stuck in Pending past its day
+   *  (isOverdue is false for it) just as much as for a genuinely Overdue
+   *  Monthly/Adhoc task (isOverdue is true for it too) — isOverdue is
+   *  always a subset of isPastDue, never the reverse. */
+  isPastDue: boolean;
   /** "{Role} Assigned · {Cadence}" (e.g. "HOD Assigned · Daily"), cadence
    *  omitted when untagged (e.g. "HOD Assigned"). Role is the RunBlock's
    *  own FlowRun.startedById's Task Manager role — "Self-assigned" when
@@ -2176,11 +2190,13 @@ function toEmployeeTaskRow(
   selfTmUserId: string,
   starterRoles: Map<string, string>,
 ): EmployeeTaskRow {
+  const isPastDue = row.dueAt !== null && row.dueAt < startOfToday;
   return {
     id: row.id,
     name: row.title,
     dueDate: row.dueAt ? row.dueAt.toISOString().slice(0, 10) : null,
-    isOverdue: row.dueAt !== null && row.dueAt < startOfToday,
+    isOverdue: row.cadence !== "DAILY" && isPastDue,
+    isPastDue,
     source: taskSourceLabel(row.run.startedById, selfTmUserId, starterRoles, row.cadence),
   };
 }
@@ -2212,15 +2228,23 @@ export async function listEmployeeTasks(userId: number): Promise<EmployeeTasksSu
       where: {
         assigneeId: tmUser.id,
         status: { notIn: ["DONE", "SKIPPED"] },
-        // No due date, or a due date that hasn't passed yet (2026-08-25,
-        // user feedback) — a task WITH a due date moves to Overdue-only
-        // once it passes, instead of staying duplicated in both lists (see
-        // the overdue query's own doc comment below for why this couldn't
-        // just be "not overdue" via the `status` field alone). A task with
-        // NO due date stays here indefinitely — it can never satisfy the
-        // overdue query's `dueAt: { lt: startOfToday }` below, so it has no
-        // other list to move to.
-        OR: [{ dueAt: null }, { dueAt: { gte: startOfToday } }],
+        // No due date, a due date that hasn't passed yet, or cadence
+        // "DAILY" regardless of its due date (2026-08-25, user feedback for
+        // the first two branches; DAILY branch added 2026-09-09, see
+        // conversation — bug fix) — a task WITH a real due date moves to
+        // Overdue-only once it passes, instead of staying duplicated in
+        // both lists (see the overdue query's own doc comment below for why
+        // this couldn't just be "not overdue" via the `status` field
+        // alone). A task with NO due date stays here indefinitely — it can
+        // never satisfy the overdue query's `dueAt: { lt: startOfToday }`
+        // below, so it has no other list to move to. A DAILY task DOES get
+        // a real dueAt (next weekday occurrence, see tasks-internal.ts's
+        // nextOccurrence), but recurs weekly regardless of whether a missed
+        // occurrence was ever completed — it has no real deadline concept,
+        // so it stays Pending unconditionally too, same as a null-dueAt
+        // row, just past-due ones now render red via isPastDue instead of
+        // looking identical to an on-time one (see toEmployeeTaskRow).
+        OR: [{ dueAt: null }, { dueAt: { gte: startOfToday } }, { cadence: "DAILY" }],
         // Cancelled/archived runs must NOT appear as pending — a run's own
         // status is separate from its blocks' status, so a cancelled run's
         // blocks stay "ACTIVE" forever unless excluded here too. Same gate
@@ -2234,17 +2258,24 @@ export async function listEmployeeTasks(userId: number): Promise<EmployeeTasksSu
       orderBy: { dueAt: "asc" },
       select: { id: true, title: true, dueAt: true, cadence: true, run: { select: { startedById: true } } },
     }),
-    // Due date strictly before today and not completed — independent of the
-    // current `status` label (Task Manager's own OVERDUE status is only set
-    // when a periodic reminder sweep gets to it, so a still-"PENDING" row
-    // past its due date belongs here too). A row now appears in exactly ONE
-    // of the two lists (2026-08-25) — the pending query above excludes
-    // anything this query would also match.
+    // Due date strictly before today, cadence isn't DAILY, and not
+    // completed — independent of the current `status` label (Task
+    // Manager's own OVERDUE status is only set when a periodic reminder
+    // sweep gets to it, so a still-"PENDING" row past its due date belongs
+    // here too). A row now appears in exactly ONE of the two lists
+    // (2026-08-25) — the pending query above excludes anything this query
+    // would also match. `cadence: { not: "DAILY" }` added (2026-09-09, see
+    // conversation — bug fix) so a Daily task never lands here regardless
+    // of its dueAt — mirrors the pending query's own new DAILY branch above
+    // and toEmployeeTaskRow's isOverdue definition; a legacy row with
+    // cadence null (untagged, see the schema field's own comment) still
+    // passes `{ not: "DAILY" }` and is unaffected.
     taskManagerPrisma.runBlock.findMany({
       where: {
         assigneeId: tmUser.id,
         status: { notIn: ["DONE", "SKIPPED"] },
         dueAt: { lt: startOfToday },
+        cadence: { not: "DAILY" },
         run: { status: { not: "CANCELLED" }, archivedAt: null },
       },
       orderBy: { dueAt: "asc" },
@@ -2306,6 +2337,12 @@ export async function getOverdueTaskCounts(userIds: number[]): Promise<Record<nu
       assigneeId: { in: [...tmIdToUserId.keys()] },
       status: { notIn: ["DONE", "SKIPPED"] },
       dueAt: { lt: startOfTodayUtc() },
+      // Excludes DAILY the same way listEmployeeTasks' overdue query does
+      // (2026-09-09, see conversation — bug fix) — this red-dot count must
+      // match what the Task tab it links to actually calls "overdue", or a
+      // namelist row would show a red dot for a Daily task that the tab
+      // itself now correctly keeps in Pending.
+      cadence: { not: "DAILY" },
       // Same cancelled/archived-run exclusion as listEmployeeTasks() —
       // see that function's comment for why it's needed.
       run: { status: { not: "CANCELLED" }, archivedAt: null },

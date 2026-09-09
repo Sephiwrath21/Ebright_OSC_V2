@@ -52,10 +52,31 @@ export default function TaskDrilldownModal({ employeeName, bucket, tasks, onClos
             <p className="py-6 text-center text-sm text-slate-400 dark:text-slate-500">No tasks for the selected month.</p>
           ) : (
             <ul className="flex flex-col gap-3">
+              {/* Red on isPastDue, not just within the Overdue bucket
+                  (2026-09-09, see conversation — new feature, matches the
+                  Employee Task tab's own TaskTable convention) — every
+                  Overdue-bucket row is isPastDue too (isOverdue is always a
+                  subset, see EmployeeTaskRow's own comment) so it's
+                  unaffected there, still entirely red. The Pending bucket is
+                  where this adds something new: a Daily task past its day
+                  stays in Pending (never moves to Overdue) but still renders
+                  red here, flagging it as late without leaving this bucket. */}
               {tasks.map((t) => (
                 <li key={t.id} className="rounded-lg border border-slate-100 dark:border-slate-800 px-4 py-3">
-                  <p className="font-medium text-slate-900 dark:text-slate-100">{t.name}</p>
-                  <div className="mt-1 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                  <p
+                    className={
+                      t.isPastDue
+                        ? "font-medium text-red-600 dark:text-red-400"
+                        : "font-medium text-slate-900 dark:text-slate-100"
+                    }
+                  >
+                    {t.name}
+                  </p>
+                  <div
+                    className={`mt-1 flex items-center gap-2 text-xs ${
+                      t.isPastDue ? "text-red-600 dark:text-red-400" : "text-slate-500 dark:text-slate-400"
+                    }`}
+                  >
                     <span>{t.source}</span>
                     {t.dueDate && (
                       <>
