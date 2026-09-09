@@ -86,10 +86,13 @@ export default async function ProfilePage({
     canEditOrgUnit ? listDepartments() : Promise.resolve([]),
     roleType === "superadmin" ? listTeamMembersByDepartment(superadminDeptCode, me.user_id) : Promise.resolve([] as TeamMember[]),
   ]);
-  const defaultOrgUnit = emp?.branch_id
-    ? `branch:${emp.branch_id}`
-    : emp?.department_id
-      ? `dept:${emp.department_id}`
+  // Department wins over branch: HQ staff carry both (the department they work
+  // in plus the implied HQ branch), and HQ isn't offered in the dropdown, so
+  // reading the branch first would leave the select with nothing to match.
+  const defaultOrgUnit = emp?.department_id
+    ? `dept:${emp.department_id}`
+    : emp?.branch_id
+      ? `branch:${emp.branch_id}`
       : "";
 
   const bank = me.bank_details;
