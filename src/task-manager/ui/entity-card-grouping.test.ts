@@ -59,22 +59,20 @@ describe("groupTasksByPerson", () => {
 });
 
 describe("groupTasksByCategory", () => {
-  it("gives every active category a card, even with zero tasks, plus an Uncategorized catch-all", () => {
+  it("gives a card to only the categories that actually have a task, plus Uncategorized when anything's uncategorized", () => {
     const categories = [{ id: "c1", name: "Flowghan" }, { id: "c2", name: "CNS" }];
     const tasks = [task({ categoryId: "c1", categoryName: "Flowghan" }), task({ categoryId: null })];
     const result = groupTasksByCategory(categories, tasks);
-    expect(result).toHaveLength(3);
+    expect(result.map((r) => r.id)).toEqual(["c1", "uncategorized"]);
     expect(result.find((r) => r.id === "c1")?.tasks).toHaveLength(1);
-    expect(result.find((r) => r.id === "c2")?.tasks).toHaveLength(0);
     expect(result.find((r) => r.id === "uncategorized")?.tasks).toHaveLength(1);
   });
 
-  it("always includes the Uncategorized card last, even with nothing uncategorized", () => {
+  it("omits the Uncategorized card when nothing is uncategorized", () => {
     const categories = [{ id: "c1", name: "Flowghan" }];
     const tasks = [task({ categoryId: "c1", categoryName: "Flowghan" })];
     const result = groupTasksByCategory(categories, tasks);
-    expect(result.at(-1)?.id).toBe("uncategorized");
-    expect(result.at(-1)?.tasks).toHaveLength(0);
+    expect(result.find((r) => r.id === "uncategorized")).toBeUndefined();
   });
 
   it("scopes to one person's tasks within each category card when onlyMe is given", () => {
@@ -101,14 +99,14 @@ describe("groupTasksByCategory", () => {
     expect(result.map((r) => r.id)).toEqual(["c1"]);
   });
 
-  it("still shows every active category (even zero-task ones) plus Uncategorized when onlyMe is omitted", () => {
+  it("hides zero-task categories even when onlyMe is omitted (View All)", () => {
     const categories = [
       { id: "c1", name: "Flowghan" },
       { id: "c2", name: "SMS" },
     ];
     const tasks = [task({ categoryId: "c1", categoryName: "Flowghan" })];
     const result = groupTasksByCategory(categories, tasks);
-    expect(result.map((r) => r.id)).toEqual(["c1", "c2", "uncategorized"]);
+    expect(result.map((r) => r.id)).toEqual(["c1"]);
   });
 
   it("routes a task with an unknown/archived categoryId into Uncategorized instead of dropping it", () => {
