@@ -245,10 +245,12 @@ export function getOrgMonthlyDepartments(
  *  correctly listed all 27. "All Regions"/"All Region X" (page.tsx) both
  *  need real branches even when empty, so this — not
  *  org.branches-flavored getOrgMonthlyDepartments' sibling — is the right
- *  source. Region branches carry bucket totals only, no `tasks` drill-down
- *  list (EntityCounts, not EntityCountsDetailed) — click-to-drill is
- *  unavailable on these cards, an accepted trade-off for correct
- *  zero-filled data. */
+ *  source. Region branches DO carry per-bucket `tasks` drill-down lists
+ *  (attachEntityTasks attaches them before groupBranchesByRegion ever
+ *  runs) — only groupBranchesByRegion's roster-only zero-fill fallback
+ *  (a real branch with literally zero tasks org-wide that day) lacks one,
+ *  same as it naturally has nothing to show. page.tsx's sumRegionRollup
+ *  relies on this to make "All Regions" click-to-drillable (2026-09-11). */
 export function getOrgMonthlyRegions(
   email: string,
   date: string | undefined,
