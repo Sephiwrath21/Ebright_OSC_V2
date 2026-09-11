@@ -657,7 +657,15 @@ function StatusDropdown({
             ref={menuRef}
             role="menu"
             style={{ top: menuPos.top, left: menuPos.left }}
-            className="fixed z-30 w-40 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md dark:border-slate-700 dark:bg-slate-800"
+            // z-[60] (2026-09-11 fix): both this menu and EntityDrillModal
+            // portal to document.body as siblings, sharing one stacking
+            // context — EntityDrillModal's own overlay is z-50, so this
+            // used to render fully behind it (menu state correctly toggled
+            // open, just invisible) whenever this dropdown was used inside
+            // that modal. z-30 was fine for every OTHER context (plain
+            // task-list rows, no competing z-50 sibling) but must beat the
+            // highest modal z-index in this file to work everywhere.
+            className="fixed z-[60] w-40 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md dark:border-slate-700 dark:bg-slate-800"
           >
           <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500">Statuses</p>
           <button
@@ -2411,7 +2419,10 @@ function BulkActionsButton({
             ref={menuRef}
             role="menu"
             style={{ top: menuPos.top, left: menuPos.left }}
-            className="fixed z-30 w-44 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md dark:border-slate-800 dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
+            // z-[60] — same EntityDrillModal (z-50) stacking fix as
+            // StatusDropdown's own menu above; this button is also used
+            // inside that modal (its "Select all" bulk actions).
+            className="fixed z-[60] w-44 rounded-lg border border-gray-200 bg-white py-1.5 shadow-md dark:border-slate-800 dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
           >
             {actions.map((a) => (
               <button
@@ -3580,7 +3591,7 @@ export function EntityDrillModal({
     return (
       <div
         key={t.runBlockId}
-        className="py-2 [&:has(button[aria-expanded='true'])]:relative [&:has(button[aria-expanded='true'])]:z-30"
+        className="group py-2 [&:has(button[aria-expanded='true'])]:relative [&:has(button[aria-expanded='true'])]:z-30"
       >
         <div className="flex items-center gap-2.5">
           {opts.tree?.kind === "parent" ? (
@@ -3603,7 +3614,16 @@ export function EntityDrillModal({
               checked={selectedIds.has(t.runBlockId)}
               onChange={() => toggleSelect(t.runBlockId)}
               aria-label={`Select ${t.blockTitle}`}
-              className="size-4 shrink-0 rounded border-gray-300 accent-blue-600 dark:border-slate-500"
+              // Hover-reveal (2026-09-11, user request): 14 always-visible
+              // checkboxes read as clutter on a list this dense. Hidden
+              // until the row is hovered/focused, but stays visible once
+              // checked — same "reveal on hover, pin once selected"
+              // convention as file managers/inboxes, so a selection made
+              // via keyboard/touch (no persistent hover) doesn't vanish the
+              // moment the pointer moves off.
+              className={`size-4 shrink-0 rounded border-gray-300 accent-blue-600 dark:border-slate-500 ${
+                selectedIds.has(t.runBlockId) ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+              }`}
             />
           )}
           <StatusDropdown task={t} myUserId={myUserId} onComplete={onComplete} onSkip={onSkip} onReopen={onReopen} />
@@ -3706,8 +3726,19 @@ export function EntityDrillModal({
           </button>
         </div>
         {ownedRows.length > 0 && (
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <label className="flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-slate-300">
+          <div className="group mb-2 flex items-center justify-between gap-3">
+            {/* Hover-reveal (2026-09-11, same convention as the per-row
+                checkboxes below): hidden until this row is hovered/
+                focused, but stays visible once any row is selected —
+                otherwise "Select all" would vanish the moment the
+                pointer left, hiding the only way to clear a selection. */}
+            <label
+              className={`flex items-center gap-2 text-xs font-medium text-gray-600 transition-opacity dark:text-slate-300 ${
+                allOwnedSelected || selectedIds.size > 0
+                  ? "opacity-100"
+                  : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+              }`}
+            >
               <input
                 type="checkbox"
                 checked={allOwnedSelected}
