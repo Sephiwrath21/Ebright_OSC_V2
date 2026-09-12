@@ -456,7 +456,7 @@ model exit_interview_note {
   // Showcause's Case Type/Training's Status, which merge free text back into
   // their own single column) so `reason` stays a clean, always-one-of-5-
   // values field for reporting/filtering (2026-08-13, see conversation).
-  reason_other            String?   @db.VarChar(255)
+  reason_other           String?   @db.VarChar(255)
   note                   String?
   users                  users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_exit_interview_note_user")
 }
@@ -1499,4 +1499,54 @@ model slot {
   branch_operating_day    branch_operating_day     @relation(fields: [branch_operating_day_id], references: [branch_operating_day_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_slot_bod")
 
   @@index([branch_operating_day_id], map: "idx_slot_bod")
+}
+
+/// Site-wide audit trail. Written automatically by the Prisma extension in
+/// src/lib/audit/extension.ts (every create/update/delete on this client) and
+/// by src/lib/audit/log.ts for non-DB events (logins, exports, downloads).
+/// Append-only from the app: the only reader is /audit-log, and the only
+/// deleter is scripts/prune-audit-log.ts.
+model audit_log {
+  id          BigInt   @id @default(autoincrement())
+  occurred_at DateTime @default(now()) @db.Timestamptz(6)
+
+  /// users.user_id — null for cron/script/worker writes (actor_type "system").
+  actor_id    Int?
+  actor_email String? @db.VarChar(255)
+  actor_name  String? @db.VarChar(255)
+  actor_role  String? @db.VarChar(50)
+  actor_type  String  @default("user") @db.VarChar(10)
+
+  /// CREATE | UPDATE | DELETE | LOGIN | LOGOUT | LOGIN_FAILED | EXPORT | DOWNLOAD
+  action    String  @db.VarChar(20)
+  /// Prisma model name for DB writes, e.g. "leave_request".
+  entity    String  @db.VarChar(64)
+  /// Stringified primary key; null for *Many operations touching several rows.
+  entity_id String? @db.VarChar(128)
+  /// Rows affected — >1 only for createMany/updateMany/deleteMany.
+  row_count Int     @default(1)
+
+  /// Masked old values, changed fields only (whole row for DELETE).
+  before  Json?
+  /// Masked new values, changed fields only.
+  after   Json?
+  /// Names of the fields that actually differed.
+  changed String[]
+
+  /// Human sentence shown in the UI, built by src/lib/audit/describe.ts.
+  summary    String?
+  /// Originating path, from the Referer header where available.
+  route      String? @db.VarChar(255)
+  ip_address String? @db.VarChar(64)
+  user_agent String?
+
+  @@index([occurred_at(sort: Desc)], map: "idx_audit_log_occurred_at")
+  @@index([actor_id, occurred_at(sort: Desc)], map: "idx_audit_log_actor")
+  @@index([entity, entity_id, occurred_at(sort: Desc)], map: "idx_audit_log_entity")
+  @@index([action, occurred_at(sort: Desc)], map: "idx_audit_log_action")
+  /// The UI's default view is human activity only, and the attendance sync
+  /// writes far more rows than people do — so that view also gets a partial
+  /// index, created in prisma/manual-sql/add_audit_log.sql (a WHERE-filtered
+  /// index has no representation in this schema language).
+  @@index([actor_type, occurred_at(sort: Desc)], map: "idx_audit_log_actor_type")
 }

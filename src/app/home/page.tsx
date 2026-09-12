@@ -211,8 +211,17 @@ export default async function HomePage({
       return { ok: false, message: err instanceof FlowBridgeError ? err.message : FALLBACK_MESSAGE };
     }
   }
-  const { staff } = await getFlowStaff();
-  const cardReassign = { staff, action: reassignTask };
+  // The one Task Manager call Home awaits outside the error-tolerant overview
+  // section below. It throws (SetupPendingError when TASK_MANAGER_DATABASE_URL
+  // is unset, FlowBridgeError when the TM database is unreachable), which used
+  // to take the whole dashboard down mid-SSR — and, because the server render
+  // failed, React re-rendered the tree on the client, which is what surfaced
+  // next-themes' inline <script> as a console error. Degrade like the section
+  // does instead: no staff → no "Assign to Others" column, dashboard intact.
+  const staff = await getFlowStaff()
+    .then((r) => r.staff)
+    .catch(() => []);
+  const cardReassign = staff.length ? { staff, action: reassignTask } : undefined;
 
   // One overview for every account type — the section itself resolves the
   // Task Manager role and scopes/routes accordingly (and renders nothing on

@@ -59,4 +59,14 @@ describe("Sidebar nav config", () => {
       expect(item.href).toMatch(/^\//);
     }
   });
+
+  it("gates ClickUp Task on department/CEO/Super Admin access", () => {
+    // 2026-09-04: the module is department accounts, CEO and Super Admin only.
+    // Without this flag the entry renders for every signed-in role, which is
+    // exactly the state this change removed.
+    const clickUp = primaryNav.find((item) => item.name === "ClickUp Task");
+
+    expect(clickUp).toBeDefined();
+    expect(clickUp?.requiresClickUpTaskAccess).toBe(true);
+  });
 });

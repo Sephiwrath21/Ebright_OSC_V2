@@ -1,7 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+import { auditExtension } from "@/lib/audit/extension";
 
 function createClient() {
   // PG session config (server-side):
@@ -46,8 +45,17 @@ function createClient() {
     idleTimeoutMillis: 30_000,
     keepAlive: true,
   });
-  return new PrismaClient({ adapter });
+  // The audit extension needs the *base* client to read before-states and to
+  // insert audit rows: going through the extended client would make it audit
+  // its own reads and recurse on its own writes. So the base is built first and
+  // handed in, and only the extended client is exported.
+  const base = new PrismaClient({ adapter });
+  return base.$extends(auditExtension(base));
 }
+
+const globalForPrisma = globalThis as unknown as {
+  prisma?: ReturnType<typeof createClient>;
+};
 
 export const prisma = globalForPrisma.prisma ?? createClient();
 

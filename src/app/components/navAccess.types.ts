@@ -15,4 +15,9 @@ export interface NavAccess {
    *  visibility (2026-08-27, see conversation). false for a denied result,
    *  including plain "staff". */
   pendingOverdueTasksAccess: boolean;
+  /** ClickUp Task is department accounts (role_type "department"), CEO and
+   *  Super Admin only (2026-09-04) — see canAccessClickUpTask in
+   *  lib/departments.ts, the SAME predicate the /clickup-task routes
+   *  themselves enforce server-side; this only hides the sidebar entry. */
+  clickUpTaskAccess: boolean;
 }

@@ -107,6 +107,11 @@ export const FEATURES: FeatureDef[] = [
 
   // Flowghan (embedded workflow / process tracker — apps/doomtracker)
   { key: "flowghan", label: "Flowghan", group: "Flowghan", actions: CRUDX },
+
+  // System — the audit trail is read-only by design: rows are written by
+  // src/lib/audit/, never by a user, so add/update/delete have nothing to
+  // enforce and are left off deliberately (they render N/A in the matrix).
+  { key: "audit_log", label: "Audit Log", group: "System", actions: ["view", "export"] },
 ];
 
 export const FEATURE_KEYS = FEATURES.map((f) => f.key);
