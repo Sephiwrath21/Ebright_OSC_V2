@@ -23,6 +23,7 @@ import {
   Award,
   ClipboardList,
   Workflow,
+  ScrollText,
 } from "lucide-react";
 import type { NavAccess } from "./navAccess.types";
 import type { TaskManagerNavAccess } from "@/task-manager/nav-access.actions";
@@ -58,12 +59,22 @@ export interface NavItem {
    *  & Overdue Tasks Overview" route itself enforces server-side (see
    *  pendingOverdueTasksAccess.ts). Omit for every other item. */
   requiresPendingOverdueTasksAccess?: boolean;
+  /** Gates on NavAccess.clickUpTaskAccess (2026-09-04) — department
+   *  accounts, CEO and Super Admin only, the same canAccessClickUpTask
+   *  predicate the /clickup-task routes enforce server-side. Omit for every
+   *  other item. */
+  requiresClickUpTaskAccess?: boolean;
   children?: NavItem[];
 }
 
 export const primaryNav: NavItem[] = [
   { name: "Home", href: "/home", Icon: Home },
-  { name: "ClickUp Task", href: "/clickup-task", Icon: ClipboardList },
+  {
+    name: "ClickUp Task",
+    href: "/clickup-task",
+    Icon: ClipboardList,
+    requiresClickUpTaskAccess: true,
+  },
   {
     name: "HRMS",
     href: "/dashboards/hrms",
@@ -235,6 +246,11 @@ export const primaryNav: NavItem[] = [
 export const secondaryNav: NavItem[] = [
   { name: "Attendance", href: "/attendance", Icon: CalendarCheck, feature: "attendance_overview" },
   { name: "Account Management", href: "/account-management", Icon: ShieldCheck, privileged: true },
+  // Sits with Account Management rather than in primaryNav: it is an admin
+  // tool, not a module people work in. Gated by the `audit_log` feature (not
+  // `privileged`) so Access Management can widen it beyond superadmin/CEO
+  // without a code change — the page re-checks the same grant server-side.
+  { name: "Audit Log", href: "/audit-log", Icon: ScrollText, feature: "audit_log" },
   {
     name: "Internal Dashboard",
     href: "https://dashboard.ebright.my",
@@ -272,6 +288,7 @@ function filterNav(
     if (item.privileged && !access.privileged) continue;
     if (item.feature && !access.features.includes(item.feature)) continue;
     if (item.requiresPendingOverdueTasksAccess && !access.pendingOverdueTasksAccess) continue;
+    if (item.requiresClickUpTaskAccess && !access.clickUpTaskAccess) continue;
     if (item.taskManagerKey) {
       // null (still loading) leaves it shown, matching the existing
       // "null access leaves the menu untouched" behavior for navAccess.

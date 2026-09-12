@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { redirect, notFound } from "next/navigation";
 import AppShell from "@/app/components/AppShell";
 import DepartmentMembers from "@/app/components/DepartmentMembers";
-import { getDepartment } from "@/lib/departments";
+import { canAccessClickUpTask, getDepartment } from "@/lib/departments";
 import { resolveAllowedDepartments } from "@/lib/department-access";
 import { getDepartmentDataset } from "@/lib/clickup-api";
 
@@ -26,6 +26,11 @@ export default async function DepartmentMembersPage({
   const userEmail = session.user?.email ?? "";
   const userRole = (session.user as { role?: string } | undefined)?.role ?? "";
   const userName = session.user?.name ?? null;
+
+  // Module-level gate (2026-09-04): ClickUp Task is department/CEO/Super Admin
+  // only (see canAccessClickUpTask). Straight to /home rather than back to the
+  // picker, which bounces these roles to /home anyway.
+  if (!canAccessClickUpTask(userRole)) redirect("/home");
 
   const allowed = await resolveAllowedDepartments(userEmail, userRole);
   if (!allowed.some((d) => d.slug === department.slug)) {

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import AppShell from "@/app/components/AppShell";
 import { resolveAllowedDepartments } from "@/lib/department-access";
+import { canAccessClickUpTask } from "@/lib/departments";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,11 @@ export default async function ClickUpTaskPage() {
   const userEmail = session.user?.email ?? "";
   const userRole = (session.user as { role?: string } | undefined)?.role ?? "";
   const userName = session.user?.name ?? null;
+
+  // Module-level gate (2026-09-04): ClickUp Task is department/CEO/Super Admin
+  // only. The sidebar hides the entry for everyone else; this is the real
+  // enforcement for anyone who reaches the URL directly.
+  if (!canAccessClickUpTask(userRole)) redirect("/home");
 
   const departments = await resolveAllowedDepartments(userEmail, userRole);
 

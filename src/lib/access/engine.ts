@@ -76,9 +76,10 @@ export class Access {
       case "own":
         return { kind: "own", userId: this.actor.userId };
       case "team":
-        // team = the actor's grouping: HODs → their department, branch-side
-        // roles → their branch.
-        if (this.actor.roleType === "hod") {
+        // team = the actor's grouping: HODs and department heads → their
+        // department, branch-side roles → their branch. Department-role users
+        // carry no branch_id, so "branch" would resolve to no rows for them.
+        if (this.actor.roleType === "hod" || this.actor.roleType === "department") {
           return { kind: "department", departmentId: this.actor.departmentId };
         }
         return { kind: "branch", branchId: this.actor.branchId };

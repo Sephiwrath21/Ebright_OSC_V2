@@ -35,3 +35,15 @@ const ANNOUNCER_ROLES = new Set(["superadmin", "ceo", "hod"]);
 export function canPostAnnouncement(role?: string | null): boolean {
   return !!role && ANNOUNCER_ROLES.has(role.toLowerCase());
 }
+
+// Who may open ClickUp Task at all (2026-09-04, per instruction): department
+// accounts (role_type "department"), CEO, and Super Admin — nobody else. Note
+// this is deliberately NARROWER than canSeeAllDepartments above, which is about
+// *which* departments an allowed user may open; this one is about reaching the
+// module in the first place. Every other role_type — branch, regional manager,
+// hod, staff — loses both the sidebar entry and the routes themselves.
+const CLICKUP_TASK_ROLES = new Set(["superadmin", "ceo", "department"]);
+
+export function canAccessClickUpTask(role?: string | null): boolean {
+  return !!role && CLICKUP_TASK_ROLES.has(role.toLowerCase());
+}
