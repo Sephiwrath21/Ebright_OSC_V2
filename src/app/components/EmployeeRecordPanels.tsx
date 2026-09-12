@@ -670,9 +670,14 @@ export function PerformanceReviewPanel({
 // Pending/Overdue are each queried). Read-only: no add/edit/delete affordance
 // exists for these (they're managed entirely from within Task Manager
 // itself), so this is a plain RecordTable with no EditableSection around it.
-// Overdue rows (isOverdue — due date passed, not completed) render in red so
-// they stand out from tasks still within their due date; every row on the
-// Overdue tab is overdue by definition, so it renders entirely red there too.
+// Rows render in red on isPastDue, not isOverdue (2026-09-09, see
+// conversation — bug fix, repointed from isOverdue): every row on the
+// Overdue tab is isOverdue (and therefore isPastDue too — isOverdue is
+// always a subset of isPastDue, see EmployeeTaskRow's own comment) so it's
+// unaffected there, still entirely red. The Pending tab is where this
+// matters — a Daily task past its day now stays in Pending instead of
+// moving to Overdue, but isPastDue is still true for it, so it still
+// renders red here, flagging it as late without moving it out of Pending.
 function TaskTable({ tasks, showRowNumbers = false }: { tasks: EmployeeTaskRow[]; showRowNumbers?: boolean }) {
   return (
     <RecordTable
@@ -687,12 +692,12 @@ function TaskTable({ tasks, showRowNumbers = false }: { tasks: EmployeeTaskRow[]
         // pagination of its own (see conversation), so this array index
         // already resets to 0 on every re-filter for free.
         name: (
-          <span className={t.isOverdue ? "text-red-600 dark:text-red-400 font-medium" : undefined}>
+          <span className={t.isPastDue ? "text-red-600 dark:text-red-400 font-medium" : undefined}>
             {showRowNumbers ? `${i + 1}. ${t.name}` : t.name}
           </span>
         ),
-        date: <span className={t.isOverdue ? "text-red-600 dark:text-red-400 font-medium" : undefined}>{t.dueDate ?? "—"}</span>,
-        source: <span className={t.isOverdue ? "text-red-600 dark:text-red-400 font-medium" : undefined}>{t.source}</span>,
+        date: <span className={t.isPastDue ? "text-red-600 dark:text-red-400 font-medium" : undefined}>{t.dueDate ?? "—"}</span>,
+        source: <span className={t.isPastDue ? "text-red-600 dark:text-red-400 font-medium" : undefined}>{t.source}</span>,
       }))}
     />
   );

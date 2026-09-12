@@ -297,6 +297,23 @@ function filterNav(
     if (item.children?.length) {
       const kids = filterNav(item.children, access, taskManagerAccess);
       if (kids.length === 0) continue;
+      // Employee Folder collapses into a direct link (2026-09-09, see
+      // conversation — new feature) when Pending & Overdue Tasks Overview
+      // is the only thing filtering-out could ever remove from it (its only
+      // other child, "Overview", has no gate of its own — see that child's
+      // own comment). Someone without pendingOverdueTasksAccess then sees
+      // "Employee Folder" as one clickable row straight to /employee-folder,
+      // not a dropdown with a single redundant "Overview" entry underneath.
+      // Scoped narrowly by name rather than "any parent down to one child
+      // collapses" — HRMS/Attendance's own "Overview" children are a
+      // different, unrelated convention (no access gate ever removes their
+      // siblings today) and this shouldn't risk changing their behavior.
+      // Someone WITH the access keeps the exact current dropdown (both kids
+      // survive filtering, this branch is skipped entirely).
+      if (item.name === "Employee Folder" && kids.length === 1 && kids[0].name === "Overview") {
+        out.push({ ...item, href: kids[0].href, exact: kids[0].exact, children: undefined });
+        continue;
+      }
       out.push({ ...item, children: kids });
     } else {
       out.push(item);

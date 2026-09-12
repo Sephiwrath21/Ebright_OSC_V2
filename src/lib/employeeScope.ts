@@ -1,6 +1,7 @@
 import "server-only";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { FINANCE_EMAIL } from "@/app/claim/roles";
 
 // ─── Employee Overview/Record data-access scope ───
 //
@@ -17,6 +18,31 @@ import { prisma } from "@/lib/prisma";
 //     Manager/regional manager/department/branch accounts are NOT included
 //     in this — they keep the department/branch-wide scope below, since
 //     only "staff" was named in the request that introduced this.
+//   - EXCEPT a real individual Branch Manager (2026-09-08, see conversation
+//     — bug fix): a real BM's role_type is "staff" too, the exact same as
+//     any rank-and-file employee — distinguished only by
+//     employment.position === "BM" (same fact/same exact-match convention
+//     already established in pendingOverdueTasksAccess.ts's own
+//     isRealBm check). Before this fix, a real BM fell into the plain
+//     "staff" branch above and got self-only scope — unable to see their
+//     own branch's team at all, unlike HOD, which DOES get department-wide
+//     scope for the analogous real-employee case (the generic fallback
+//     branch below already covered "hod" correctly; only "staff" needed
+//     this carve-out, since BM is the one role that hides behind "staff").
+//     Now: a real BM gets branch-wide scope, same treatment HOD gets for
+//     department. A GENERIC shared "branch"-role login (role_type
+//     "branch", not tied to one real employee) is unaffected by this
+//     change — it was never "staff" and already reaches the same
+//     branch-wide outcome via the generic fallback branch below.
+//   - EXCEPT finance@ebright.my specifically (2026-09-08, see conversation)
+//     — company-wide view scope, by exact email match, not by its role_type
+//     ("department", the same role_type plenty of other, non-Finance
+//     accounts also carry, none of which get this). Finance needs to run
+//     payroll/claims across every department, not just its own — the
+//     generic department-code fallback below would otherwise cap it to
+//     Finance-department employees only. Section-level narrowing (Payroll/
+//     Tax Info/Financial Settlement only, everything else hidden) is a
+//     separate concern — see employeeSectionAccess.ts.
 //   - every other non-full-access account (branch, department, hod, branch
 //     manager, regional manager) is scoped to its own active employment's
 //     department; branch is only used as the scoping key when that
@@ -53,6 +79,11 @@ export interface ScopableRow {
 const FULL_ACCESS_ROLE_TYPES = new Set(["hr", "superadmin"]);
 const CEO_ROLE_TYPE = "ceo";
 const STAFF_ROLE_TYPE = "staff";
+// Exact-match convention, not fuzzy (2026-09-08, see conversation) — same
+// reasoning as pendingOverdueTasksAccess.ts's own BM_POSITION: live
+// employment.position data is messy free text, so this only ever matches
+// the one clean "BM" value real Branch Manager rows actually carry.
+const BM_POSITION = "BM";
 
 /** Resolves the current session's own scope. Returns null if there is no
  *  authenticated session — callers must already be gating on auth() before
@@ -80,6 +111,21 @@ export async function getEmployeeScopeForEmail(email: string): Promise<EmployeeS
   });
   if (!me) return null;
 
+  // Finance (2026-09-08, see conversation) — company-wide VIEW scope for
+  // finance@ebright.my specifically, by exact email match, NOT a blanket
+  // rule for role_type "department" (finance@ebright.my's own role_type):
+  // every other "department" account (HR's own included, historically) is
+  // still scoped to its own department below. A code-level email check was
+  // chosen over flipping users.is_full_access in the database for this
+  // account, since the latter would be a real DB write, and this repo's
+  // standing rule is no DB writes without explicit one-off permission — an
+  // email match here needs none. Row-level access only; section-level
+  // narrowing (Payroll/Tax Info/Financial Settlement only) is a separate
+  // concern, applied by employeeSectionAccess.ts, not here.
+  if (email.trim().toLowerCase() === FINANCE_EMAIL.trim().toLowerCase()) {
+    return { fullAccess: true, ownUserId: null, departmentCode: null, branchCode: null };
+  }
+
   if (me.is_full_access || FULL_ACCESS_ROLE_TYPES.has(me.role.role_type.toLowerCase())) {
     return { fullAccess: true, ownUserId: null, departmentCode: null, branchCode: null };
   }
@@ -98,6 +144,11 @@ export async function getEmployeeScopeForEmail(email: string): Promise<EmployeeS
   }
 
   if (me.role.role_type.toLowerCase() === STAFF_ROLE_TYPE) {
+    const emp = me.employment[0];
+    const isRealBranchManager = (emp?.position ?? "").trim().toUpperCase() === BM_POSITION;
+    if (isRealBranchManager && emp?.branch?.branch_code) {
+      return { fullAccess: false, ownUserId: null, departmentCode: null, branchCode: emp.branch.branch_code };
+    }
     return { fullAccess: false, ownUserId: me.user_id, departmentCode: null, branchCode: null };
   }
 

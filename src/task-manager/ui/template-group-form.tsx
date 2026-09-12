@@ -76,6 +76,24 @@ export function TemplateGroupFormModal({
   const [taskKeys, setTaskKeys] = React.useState<string[]>(() => tasks.map(() => crypto.randomUUID()));
   const [guidelines, setGuidelines] = React.useState<TaskGuideline[]>([{ ...EMPTY_GUIDELINE }]);
   const imageInputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
+  // Enter-to-confirm (2026-09-04, user request — matches the Subtasks
+  // input's own existing Enter behavior): Name field's Enter moves to
+  // Task 1's title; a task title's Enter moves to the NEXT task's title,
+  // or adds a fresh task and moves there if this is the last one. Neither
+  // field is inside a <form>, so Enter was previously just inert — no
+  // accidental-submit risk existed before this, but preventDefault is
+  // kept anyway as cheap insurance against that ever changing.
+  const nameInputRef = React.useRef<HTMLInputElement | null>(null);
+  const taskTitleRefs = React.useRef<(HTMLInputElement | null)[]>([]);
+  const [pendingFocusIndex, setPendingFocusIndex] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    if (pendingFocusIndex === null) return;
+    taskTitleRefs.current[pendingFocusIndex]?.focus();
+    setPendingFocusIndex(null);
+    // Re-run once `tasks` actually grows a new slot for pendingFocusIndex
+    // to focus — addTask() below sets both in the same tick, but the new
+    // ref only exists after THIS render commits.
+  }, [pendingFocusIndex, tasks.length]);
   const [loading, setLoading] = React.useState(isEdit || Boolean(duplicateFromId));
   const [pending, startTransition] = React.useTransition();
   const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
@@ -168,8 +186,9 @@ export function TemplateGroupFormModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [duplicateFromId, groupId]);
 
-  const addTask = () => {
+  const addTask = (focusNew = false) => {
     if (tasks.length >= TASK_MAX) return;
+    if (focusNew) setPendingFocusIndex(tasks.length);
     setTasks((prev) => [...prev, { title: "", subtasks: [] }]);
     setTaskKeys((prev) => [...prev, crypto.randomUUID()]);
     setGuidelines((prev) => [...prev, { ...EMPTY_GUIDELINE }]);
@@ -180,6 +199,7 @@ export function TemplateGroupFormModal({
     setTaskKeys((prev) => prev.filter((_, i) => i !== index));
     setGuidelines((prev) => prev.filter((_, i) => i !== index));
     imageInputRefs.current.splice(index, 1);
+    taskTitleRefs.current.splice(index, 1);
     setDirty(true);
   };
   const updateTitle = (index: number, title: string) => {
@@ -342,10 +362,16 @@ export function TemplateGroupFormModal({
             <label className="text-sm text-gray-600 dark:text-slate-300">
               {label} name
               <input
+                ref={nameInputRef}
                 value={name}
                 onChange={(e) => {
                   setName(e.target.value);
                   setDirty(true);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  taskTitleRefs.current[0]?.focus();
                 }}
                 placeholder="e.g. Create Video"
                 maxLength={100}
@@ -370,8 +396,17 @@ export function TemplateGroupFormModal({
                   <label className="flex-1 text-sm text-gray-600 dark:text-slate-300">
                     Task {index + 1}
                     <input
+                      ref={(el) => {
+                        taskTitleRefs.current[index] = el;
+                      }}
                       value={task.title}
                       onChange={(e) => updateTitle(index, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter") return;
+                        e.preventDefault();
+                        if (index < tasks.length - 1) taskTitleRefs.current[index + 1]?.focus();
+                        else addTask(true);
+                      }}
                       placeholder="Task title"
                       className="mt-1 w-full rounded-full border border-gray-300 px-4 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-950 dark:text-slate-100"
                     />
@@ -441,7 +476,7 @@ export function TemplateGroupFormModal({
 
             <button
               type="button"
-              onClick={addTask}
+              onClick={() => addTask()}
               disabled={tasks.length >= TASK_MAX}
               className="self-start rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 dark:border-slate-500 dark:bg-slate-950 dark:text-slate-300"
             >

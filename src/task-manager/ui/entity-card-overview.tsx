@@ -136,7 +136,19 @@ function statusGroupedTasks(tasks: FlowTaskRow[]): FlowTaskRow[] {
  *  See the "List/Donut" toggle button just above in the header for where
  *  this is switched on, and the groupByStatus doc comment for why it
  *  never applies to HOD/CEO Assigned Task. */
-function PersonDonutCard({ card }: { card: PersonCard }) {
+function PersonDonutCard({
+  card,
+  myUserId,
+  onComplete,
+  onSkip,
+  onReopen,
+}: {
+  card: PersonCard;
+  myUserId?: string;
+  onComplete?: (runBlockId: string) => Promise<ActionResult>;
+  onSkip?: (runBlockId: string) => Promise<ActionResult>;
+  onReopen?: (runBlockId: string) => Promise<ActionResult>;
+}) {
   // Rows open EntityDrillModal on click, same as DepartmentDonutCard
   // (department-donut-overview.tsx) rather than expanding inline
   // (2026-08-25, reverted back from inline expansion — user request to
@@ -228,7 +240,16 @@ function PersonDonutCard({ card }: { card: PersonCard }) {
       </div>
 
       {drill && (
-        <EntityDrillModal name={card.name} tasks={byBucket} bucketKey={drill} onClose={() => setDrill(null)} />
+        <EntityDrillModal
+          name={card.name}
+          tasks={byBucket}
+          bucketKey={drill}
+          onClose={() => setDrill(null)}
+          myUserId={myUserId}
+          onComplete={onComplete}
+          onSkip={onSkip}
+          onReopen={onReopen}
+        />
       )}
     </div>
   );
@@ -867,7 +888,13 @@ export function EntityCardOverview({
                     // groupByStatus sections (HOD/CEO Assigned Task) — the
                     // toggle button itself is hidden there, so cardMode
                     // stays "list" by default; see the header control below.
-                    <PersonDonutCard card={card} />
+                    <PersonDonutCard
+                      card={card}
+                      myUserId={myUserId}
+                      onComplete={onComplete}
+                      onSkip={onSkip}
+                      onReopen={onReopen}
+                    />
                   ) : (
                   <div
                     // Scrollable body (2026-08-15) — a capped height with

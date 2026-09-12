@@ -3593,9 +3593,10 @@ export function PipPanel({ userId, data, canEdit = true }: { userId: number; dat
 // ─── Exit's 3 singleton tabs (resignation/reference_letter/
 // exit_interview_note) — Exit stage-flow only, no Employee Record equivalent
 // (mirrors probation's own placement). Resignation Letter/Acceptance Letter/
-// Issued Letter route to GOOGLE_DRIVE_LETTER_FOLDER_ID, same shared "letters"
-// folder as probation's confirmation/extension letters and (per this task)
-// suspension/showcause letters. ───
+// Issued Letter each now resolve their own dedicated subfolder under
+// GOOGLE_DRIVE_EMPLOYEE_FOLDER_ID's OFFBOARDING tab (2026-09-05, see
+// conversation — the old shared GOOGLE_DRIVE_LETTER_FOLDER_ID bucket is kept
+// only as the per-category fallback until each new subfolder exists). ───
 
 const EXIT_TYPE_OPTIONS = [
   { value: "Resignation", label: "Resignation" },

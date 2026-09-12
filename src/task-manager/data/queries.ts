@@ -15,6 +15,8 @@ import { ApiHttpError } from "../lib/api-server";
 import { prisma } from "../prisma";
 import { prisma as hrfsPrisma } from "@/lib/prisma";
 import type { EmployeeScope } from "@/lib/employeeScope";
+import { stageFromEmployment } from "@/lib/employeeStages";
+import { mapPortalEmployee } from "../../../prisma/task-manager/hrfs-map";
 import { FINANCE_EMAIL } from "../role-views";
 import {
   analyticsQuerySchema,
@@ -243,10 +245,12 @@ export function getOrgMonthlyDepartments(
  *  correctly listed all 27. "All Regions"/"All Region X" (page.tsx) both
  *  need real branches even when empty, so this — not
  *  org.branches-flavored getOrgMonthlyDepartments' sibling — is the right
- *  source. Region branches carry bucket totals only, no `tasks` drill-down
- *  list (EntityCounts, not EntityCountsDetailed) — click-to-drill is
- *  unavailable on these cards, an accepted trade-off for correct
- *  zero-filled data. */
+ *  source. Region branches DO carry per-bucket `tasks` drill-down lists
+ *  (attachEntityTasks attaches them before groupBranchesByRegion ever
+ *  runs) — only groupBranchesByRegion's roster-only zero-fill fallback
+ *  (a real branch with literally zero tasks org-wide that day) lacks one,
+ *  same as it naturally has nothing to show. page.tsx's sumRegionRollup
+ *  relies on this to make "All Regions" click-to-drillable (2026-09-11). */
 export function getOrgMonthlyRegions(
   email: string,
   date: string | undefined,
@@ -263,25 +267,84 @@ export function getOrgMonthlyRegions(
   }, "getOrgMonthlyRegions");
 }
 
+/** Live department/branch/employmentType overlay for getFlowStaff (2026-09-09):
+ *  the local User table's copies of these fields only refresh on the next
+ *  `tm:bootstrap` run, so the recipient picker can show stale HRFS data
+ *  between runs. Reads hrfs.public.employment (joined to users/department/
+ *  branch — same join bootstrap.ts's fetchPortalEmployees does via raw SQL,
+ *  here via the existing hrfsPrisma client) and runs each active-employment
+ *  row through the SAME normalization bootstrap uses (stageFromEmployment,
+ *  mapPortalEmployee) so the two stay consistent. Deliberately ignores
+ *  mapPortalEmployee's `role` output — portal position text has no notion of
+ *  ADMIN/CEO/OPS/DEPT_SITE/BRANCH_SITE, those only ever come from the local
+ *  table's OVERRIDES/ROLE_MAP/EXTRA_USERS-derived role. Keyed by lowercased
+ *  email; a local User with no entry here (test-* accounts, EXTRA_USERS site
+ *  logins, anyone with no currently-active HRFS employment row) simply keeps
+ *  its local values — see getFlowStaff. */
+async function fetchLiveEmploymentByEmail(): Promise<
+  Map<string, { department: string | null; branch: string | null; employmentType: string | null }>
+> {
+  const rows = await hrfsPrisma.employment.findMany({
+    where: { status: "active" },
+    select: {
+      position: true,
+      status: true,
+      end_date: true,
+      users: { select: { email: true, user_profile: { select: { full_name: true } } } },
+      department: { select: { department_name: true } },
+      branch: { select: { branch_name: true } },
+    },
+  });
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const byEmail = new Map<string, { department: string | null; branch: string | null; employmentType: string | null }>();
+  for (const r of rows) {
+    const endIso = r.end_date ? r.end_date.toISOString().slice(0, 10) : null;
+    const isActive = stageFromEmployment(r.status, endIso, todayIso) === "active";
+    const result = mapPortalEmployee({
+      email: r.users.email,
+      name: r.users.user_profile?.full_name ?? null,
+      position: isActive ? r.position : null,
+      department: isActive ? (r.department?.department_name ?? null) : null,
+      branch: isActive ? (r.branch?.branch_name ?? null) : null,
+    });
+    if (!result.ok) continue;
+    byEmail.set(result.user.email, {
+      department: result.user.department,
+      branch: result.user.branch,
+      employmentType: result.user.employmentType,
+    });
+  }
+  return byEmail;
+}
+
 // Deliberately no per-user auth (donor parity): call sites must sit behind
 // session auth. Returns the PII-free staff subset only.
-/** Assignable staff directory (recipient picker options). */
+/** Assignable staff directory (recipient picker options). id/name/role always
+ *  come from the local table (the identity/permission backbone); department/
+ *  branch/employmentType are live-overlaid from HRFS where available — see
+ *  fetchLiveEmploymentByEmail. */
 export function getFlowStaff(): Promise<{ staff: FlowStaffMember[] }> {
   return native(async () => {
-    const users = await prisma.user.findMany({
-      where: { role: { in: ["CEO", "HOD", "BRANCH", "MEMBER"] } },
-      orderBy: { name: "asc" },
-    });
+    const [users, liveByEmail] = await Promise.all([
+      prisma.user.findMany({
+        where: { role: { in: ["CEO", "HOD", "BRANCH", "MEMBER"] } },
+        orderBy: { name: "asc" },
+      }),
+      fetchLiveEmploymentByEmail(),
+    ]);
     return {
-      staff: users.map((u) => ({
-        id: u.id,
-        name: u.name,
-        role: u.role,
-        department: u.department,
-        branch: u.branch,
-        employmentType: u.employmentType,
-        coachSchedule: u.coachSchedule,
-      })) as FlowStaffMember[],
+      staff: users.map((u) => {
+        const live = liveByEmail.get(u.email.toLowerCase());
+        return {
+          id: u.id,
+          name: u.name,
+          role: u.role,
+          department: live?.department ?? u.department,
+          branch: live?.branch ?? u.branch,
+          employmentType: live?.employmentType ?? u.employmentType,
+          coachSchedule: u.coachSchedule,
+        };
+      }) as FlowStaffMember[],
     };
   }, "getFlowStaff");
 }

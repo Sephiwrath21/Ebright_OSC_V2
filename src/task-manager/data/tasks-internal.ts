@@ -102,7 +102,7 @@ export const GUIDELINE_IMAGE_MIMES = ["image/png", "image/jpeg", "image/webp"] a
 const GUIDELINE_IMAGE_MAX_BASE64 = 2 * 1024 * 1024 * 1.37;
 
 export const assignInputSchema = z.object({
-  title: z.string().trim().min(1).max(200),
+  title: z.string().trim().min(1),
   branches: z.array(z.string().min(1).max(100)).max(50).default([]),
   role: z.enum(["All", ...BRANCH_STAFF_ROLES]).default("All"),
   days: z.array(z.enum(DAYS)).max(DAYS.length).default([]),

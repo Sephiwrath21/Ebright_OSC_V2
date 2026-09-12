@@ -147,10 +147,17 @@ const ALL_REGIONS_VALUE = "All Regions";
  *  data. org.regions (queries.ts's getOrgMonthlyRegions doc comment has
  *  the full story) is ALREADY correctly roster-first — every real branch
  *  always present, zero-filled — so this now just sums it, no filtering
- *  needed). region.branches carries bucket totals only (EntityCounts, not
- *  EntityCountsDetailed) — no `tasks` drill-down list, so click-to-drill
- *  is unavailable on cards built from this; an accepted trade-off for
- *  correct zero-filled data over a currently-broken drill feature. */
+ *  needed).
+ *
+ *  2026-09-11: also concatenates each branch's per-bucket `tasks` arrays
+ *  into one region-level list, so the "All Regions" card is click-to-
+ *  drillable too — a prior doc comment here claimed region.branches only
+ *  carried bucket totals with no task detail, but attachEntityTasks
+ *  (_payloads.ts) already attaches real per-bucket task lists to every
+ *  branch with at least one task; only the roster-only zero-fill fallback
+ *  in groupBranchesByRegion (analytics/_lib.ts) lacks a `tasks` field, and
+ *  `?? []` below covers that case with an empty list, same as it
+ *  naturally would have nothing to show anyway. */
 function sumRegionRollup(region: { name: string; branches: FlowEntityRollup[] }): FlowEntityRollup {
   const totals = region.branches.reduce(
     (acc, b) => ({
@@ -160,7 +167,12 @@ function sumRegionRollup(region: { name: string; branches: FlowEntityRollup[] })
     }),
     { completed: 0, pending: 0, na: 0 },
   );
-  return { name: region.name, ...totals };
+  const tasks = {
+    completed: region.branches.flatMap((b) => b.tasks?.completed ?? []),
+    pending: region.branches.flatMap((b) => b.tasks?.pending ?? []),
+    na: region.branches.flatMap((b) => b.tasks?.na ?? []),
+  };
+  return { name: region.name, ...totals, tasks };
 }
 
 /** "All Region A" / "All Region B" / "All Region C" (2026-08-25, user
