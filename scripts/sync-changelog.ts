@@ -10,7 +10,27 @@
  * full history on disk after the deploy script's `git reset --hard
  * origin/main`, and `.git` is excluded from the container image. So the host
  * runs git, the container parses — no API token to store anywhere, no rate
- * limit, and nothing to fail when GitHub is unreachable.
+ * limit, and nothing to fail when GitHub is unreachable. That asymmetry (git
+ * on the host, Node and DATABASE_URL in the container) is the whole reason for
+ * the pipe.
+ *
+ * The deploy.yml side is deliberately three lines and no more. Its `script:`
+ * block is ~24KB, and GitHub Actions rejects the ENTIRE workflow file — with
+ * no usable error, just a run named after the file path and zero jobs — once
+ * that block passes roughly 25KB. A first attempt at this feature added 22
+ * lines of explanatory comment there and broke every deploy on the repo until
+ * it was trimmed (2026-09-15; measured valid at 25,038 bytes, invalid at
+ * 25,741). Hence: the explanation lives here, where it costs nothing.
+ *
+ * The git-log format string is duplicated in deploy.yml, because git runs on
+ * the host while this parser runs in the container. It is spelled there as
+ * "%x1e%H%x1f%ad%x1f%an%x1f%s%x1f%b%x1f", which is byte-identical to
+ * GIT_LOG_FORMAT in src/lib/hotfix/gitlog.ts. Change one and you must change
+ * the other.
+ *
+ * It is also wired up as non-fatal (`|| true`): by the time it runs the deploy
+ * has already succeeded and been health-checked, so a changelog problem must
+ * never turn a good deploy red.
  *
  *   # On the server, as the deploy script does:
  *   git log --no-merges --date=short --name-only --format=... -n 500 \
