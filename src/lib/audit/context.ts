@@ -22,8 +22,13 @@ export type AuditActor = {
   actorType: "user" | "system";
 };
 
+/**
+ * Note what is NOT here: the client IP. It was captured until 2026-09-15 and
+ * is no longer collected at all — not stored, not shown, not exported, and the
+ * column is gone (prisma/manual-sql/drop_audit_log_ip_address.sql). Re-adding
+ * it means re-adding the column, so it cannot come back by accident.
+ */
 export type AuditRequestInfo = {
-  ipAddress: string | null;
   userAgent: string | null;
   route: string | null;
 };
@@ -39,7 +44,6 @@ const SYSTEM_ACTOR: AuditActor = {
 };
 
 const NO_REQUEST: AuditRequestInfo = {
-  ipAddress: null,
   userAgent: null,
   route: null,
 };
@@ -84,7 +88,7 @@ export const getAuditActor = cache(async (): Promise<AuditActor> => {
 });
 
 /**
- * Client IP, user agent and originating path.
+ * User agent and originating path. The client IP is not read at all.
  *
  * `route` comes from the Referer header: this app deliberately has no
  * proxy.ts, and adding one that runs on every request just to stamp a path
@@ -106,10 +110,6 @@ export const getAuditRequestInfo = cache(async (): Promise<AuditRequestInfo> => 
       }
     }
     return {
-      ipAddress:
-        h.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-        h.get("x-real-ip") ??
-        null,
       userAgent: h.get("user-agent"),
       route,
     };

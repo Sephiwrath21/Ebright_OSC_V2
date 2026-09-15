@@ -10,7 +10,14 @@
 --   src/lib/audit/extension.ts  — every create/update/delete on the portal client
 --   src/lib/audit/log.ts        — logins, logouts, failed logins, exports
 -- Read by:    /audit-log  (superadmin + CEO, via the audit_log RBAC feature)
--- Pruned by:  scripts/prune-audit-log.ts  (default 365-day retention)
+--
+-- RETENTION: entries are kept indefinitely. scripts/prune-audit-log.ts exists
+-- but is deliberately NOT scheduled anywhere — no cron, no workflow, no npm
+-- script — so nothing is ever deleted unless someone runs it by hand
+-- (decision, 2026-09-15). The trade-off accepted with that: the table grows
+-- without bound, which matters here because the log captures automated writes
+-- too and the attendance sync is by far the largest writer. Revisit by
+-- scheduling the script, not by deleting rows ad hoc.
 --
 --   psql "$DATABASE_URL" -f prisma/manual-sql/add_audit_log.sql
 -- ─────────────────────────────────────────────────────────────
@@ -41,7 +48,6 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
   summary     TEXT,
   route       VARCHAR(255),
-  ip_address  VARCHAR(64),
   user_agent  TEXT
 );
 

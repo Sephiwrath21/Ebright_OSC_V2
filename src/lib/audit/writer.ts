@@ -48,7 +48,6 @@ export type AuditEntry = {
 
   summary: string;
   route: string | null;
-  ipAddress: string | null;
   userAgent: string | null;
 };
 
@@ -61,7 +60,6 @@ const LIMITS: Record<string, number> = {
   entity: 64,
   entityId: 128,
   route: 255,
-  ipAddress: 64,
 };
 
 function clamp(value: string | null, limit: number): string | null {
@@ -105,7 +103,6 @@ export async function writeAuditRow(
     changed: entry.changed,
     summary: entry.summary,
     route: clamp(entry.route, LIMITS.route),
-    ip_address: clamp(entry.ipAddress, LIMITS.ipAddress),
     user_agent: entry.userAgent,
   };
 

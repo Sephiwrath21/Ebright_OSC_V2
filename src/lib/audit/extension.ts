@@ -131,7 +131,6 @@ export function auditExtension(base: unknown) {
                 actorRole: ctx.actorRole,
                 actorType: ctx.actorType,
                 route: ctx.route,
-                ipAddress: ctx.ipAddress,
                 userAgent: ctx.userAgent,
               });
             }
@@ -149,7 +148,7 @@ export function auditExtension(base: unknown) {
 /** Everything about the entry that does not depend on who made the change. */
 type PartialEntry = Omit<
   AuditEntry,
-  "actorId" | "actorEmail" | "actorName" | "actorRole" | "actorType" | "route" | "ipAddress" | "userAgent"
+  "actorId" | "actorEmail" | "actorName" | "actorRole" | "actorType" | "route" | "userAgent"
 >;
 
 function buildEntry(

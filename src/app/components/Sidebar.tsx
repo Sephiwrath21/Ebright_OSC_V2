@@ -24,6 +24,7 @@ import {
   ClipboardList,
   Workflow,
   ScrollText,
+  Wrench,
 } from "lucide-react";
 import type { NavAccess } from "./navAccess.types";
 import type { TaskManagerNavAccess } from "@/task-manager/nav-access.actions";
@@ -250,7 +251,11 @@ export const secondaryNav: NavItem[] = [
   // tool, not a module people work in. Gated by the `audit_log` feature (not
   // `privileged`) so Access Management can widen it beyond superadmin/CEO
   // without a code change — the page re-checks the same grant server-side.
-  { name: "Audit Log", href: "/audit-log", Icon: ScrollText, feature: "audit_log" },
+  { name: "Log", href: "/audit-log", Icon: ScrollText, feature: "audit_log" },
+  // Superadmin only — `feature` resolves through ACTION_CEILINGS, which makes
+  // can("hotfix_log", "view") return isSuper for everyone, CEO included. So
+  // this needs no `privileged` flag: the ceiling is stricter than that flag is.
+  { name: "Hotfix", href: "/hotfix-log", Icon: Wrench, feature: "hotfix_log" },
   {
     name: "Internal Dashboard",
     href: "https://dashboard.ebright.my",

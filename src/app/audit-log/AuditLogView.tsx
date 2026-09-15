@@ -187,7 +187,9 @@ function DetailRow({ row, columns }: { row: AuditLogRow; columns: number }) {
             <Meta label="Record ID" value={row.entityId ?? "—"} mono />
             <Meta label="Rows affected" value={String(row.rowCount)} />
             <Meta label="Page" value={row.route ?? "—"} mono />
-            <Meta label="IP address" value={row.ipAddress ?? "—"} mono />
+            {/* No IP address row: client IPs are not collected at all as of
+                2026-09-15 — not captured, not stored, not exported, and the
+                column has been dropped. */}
             <Meta label="Browser" value={row.userAgent ?? "—"} />
           </dl>
         </div>
@@ -312,7 +314,7 @@ export default function AuditLogView({
             <ScrollText className="h-5 w-5" />
           </span>
           <div>
-            <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Audit Log</h1>
+            <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Log</h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Every change made in the portal — who did it, what changed, and when.
             </p>

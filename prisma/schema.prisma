@@ -919,6 +919,7 @@ model users {
   exit_system_revocation_states                  exit_system_revocation_state[]  @relation("SRStateUser")
   exit_system_revocation_states_checked          exit_system_revocation_state[]  @relation("SRStateCheckedBy")
   exit_financial_settlement                      exit_financial_settlement?
+  hotfix_log_curated                             hotfix_log[]                    @relation("hotfix_log_curated")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -1504,8 +1505,10 @@ model slot {
 /// Site-wide audit trail. Written automatically by the Prisma extension in
 /// src/lib/audit/extension.ts (every create/update/delete on this client) and
 /// by src/lib/audit/log.ts for non-DB events (logins, exports, downloads).
-/// Append-only from the app: the only reader is /audit-log, and the only
-/// deleter is scripts/prune-audit-log.ts.
+/// Append-only from the app: the only reader is /audit-log, and the only thing
+/// that can delete a row is scripts/prune-audit-log.ts — which is not
+/// scheduled anywhere, so in practice entries are kept indefinitely
+/// (decision, 2026-09-15). See add_audit_log.sql for the trade-off.
 model audit_log {
   id          BigInt   @id @default(autoincrement())
   occurred_at DateTime @default(now()) @db.Timestamptz(6)
@@ -1537,7 +1540,6 @@ model audit_log {
   summary    String?
   /// Originating path, from the Referer header where available.
   route      String? @db.VarChar(255)
-  ip_address String? @db.VarChar(64)
   user_agent String?
 
   @@index([occurred_at(sort: Desc)], map: "idx_audit_log_occurred_at")
@@ -1549,4 +1551,52 @@ model audit_log {
   /// index, created in prisma/manual-sql/add_audit_log.sql (a WHERE-filtered
   /// index has no representation in this schema language).
   @@index([actor_type, occurred_at(sort: Desc)], map: "idx_audit_log_actor_type")
+}
+
+/// Hotfix / changelog log — "what's new, what's fixed" on the portal.
+///
+/// Rows are derived from commits on `main` by scripts/sync-changelog.ts, which
+/// runs on the production server at deploy time. Superadmin-only via
+/// ACTION_CEILINGS in src/lib/access/types.ts.
+///
+/// The columns split into two halves that must not be confused:
+///   • Everything above `title_override` is owned by the sync and is
+///     overwritten on every run.
+///   • title_override / hidden / curated_* are owned by people, and the sync
+///     never writes them — that is what makes a reword survive a re-sync.
+model hotfix_log {
+  id Int @id @default(autoincrement())
+
+  /// Full commit SHA. Unique, and the key the sync upserts on, which is what
+  /// makes re-running the script (or backfilling) idempotent.
+  commit_sha String @unique @db.VarChar(40)
+  /// Commit date — the day the change shipped. A plain date: it is a calendar
+  /// day, and it groups the changelog.
+  shipped_on DateTime @db.Date
+  /// Portal area, derived from the commit's changed file paths.
+  category   String   @db.VarChar(40)
+  /// ADDED | FIXED | UPDATED — see src/lib/hotfix/derive.ts
+  tag        String   @db.VarChar(10)
+  /// Commit subject, with any conventional-commit prefix stripped.
+  title       String  @db.VarChar(300)
+  /// Commit body, when there is one.
+  details     String  @default("")
+  author_name String? @db.VarChar(200)
+
+  /// Human rewrite of `title`. Null means "show the commit subject".
+  title_override String?   @db.VarChar(300)
+  /// Hidden from the default view. Set by the sync ONLY on first insert (for
+  /// CI/deploy noise); after that it belongs to whoever curates the log.
+  hidden         Boolean   @default(false)
+  curated_by     Int?
+  curated_at     DateTime? @db.Timestamptz(6)
+
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  curator users? @relation("hotfix_log_curated", fields: [curated_by], references: [user_id], onDelete: SetNull, onUpdate: NoAction, map: "fk_hotfix_log_curator")
+
+  @@index([shipped_on(sort: Desc)], map: "idx_hotfix_log_shipped_on")
+  @@index([category], map: "idx_hotfix_log_category")
+  @@index([hidden], map: "idx_hotfix_log_hidden")
 }

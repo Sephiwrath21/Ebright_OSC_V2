@@ -111,7 +111,10 @@ export const FEATURES: FeatureDef[] = [
   // System — the audit trail is read-only by design: rows are written by
   // src/lib/audit/, never by a user, so add/update/delete have nothing to
   // enforce and are left off deliberately (they render N/A in the matrix).
-  { key: "audit_log", label: "Audit Log", group: "System", actions: ["view", "export"] },
+  { key: "audit_log", label: "Log", group: "System", actions: ["view", "export"] },
+  // Superadmin-only, enforced through ACTION_CEILINGS below rather than by a
+  // grant — see the note there for why a plain grant would not be enough.
+  { key: "hotfix_log", label: "Hotfix", group: "System", actions: ["view", "add", "update", "delete"] },
 ];
 
 export const FEATURE_KEYS = FEATURES.map((f) => f.key);
@@ -121,8 +124,21 @@ export function featureApplies(featureKey: string, action: PermAction): boolean 
 }
 
 // Superadmin-only ceiling — hardcoded, enforced before any role grant, never
-// editable from the UI. (None yet for the coarse feature set; add as needed.)
-export const ACTION_CEILINGS: ReadonlySet<string> = new Set<string>();
+// editable from the UI.
+//
+// hotfix_log is superadmin-only *by requirement*, and a grant alone cannot
+// express that: Access.can() short-circuits `if (this.isCeo) return action ===
+// "view"`, so the CEO would see any feature carrying a `view` action no matter
+// what role_permission says. The ceiling is checked BEFORE that short-circuit
+// (see engine.ts), which is the only way to keep a feature off the CEO's
+// screen. Listing every action also makes the Access Management matrix render
+// the whole row as locked rather than as tick-boxes that silently do nothing.
+export const ACTION_CEILINGS: ReadonlySet<string> = new Set<string>([
+  "hotfix_log.view",
+  "hotfix_log.add",
+  "hotfix_log.update",
+  "hotfix_log.delete",
+]);
 
 export function isCeilingLocked(featureKey: string, action: PermAction): boolean {
   return ACTION_CEILINGS.has(`${featureKey}.${action}`);

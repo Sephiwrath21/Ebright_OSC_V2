@@ -79,7 +79,6 @@ export async function logAuditEvent(input: LogAuditEventInput): Promise<void> {
       }),
 
       route: ctx.route,
-      ipAddress: ctx.ipAddress,
       userAgent: ctx.userAgent,
     });
   } catch (err) {

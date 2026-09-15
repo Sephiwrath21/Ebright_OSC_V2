@@ -37,7 +37,6 @@ export type AuditLogRow = {
   after: unknown;
   summary: string | null;
   route: string | null;
-  ipAddress: string | null;
   userAgent: string | null;
 };
 
@@ -112,7 +111,6 @@ function serialise(row: {
   after: unknown;
   summary: string | null;
   route: string | null;
-  ip_address: string | null;
   user_agent: string | null;
 }): AuditLogRow {
   return {
@@ -132,7 +130,6 @@ function serialise(row: {
     after: row.after,
     summary: row.summary,
     route: row.route,
-    ipAddress: row.ip_address,
     userAgent: row.user_agent,
   };
 }
@@ -150,7 +147,6 @@ const CSV_COLUMNS = [
   "What happened",
   "Changed fields",
   "Page",
-  "IP address",
 ] as const;
 
 function csvCell(value: unknown): string {
@@ -177,7 +173,6 @@ function toCsv(rows: AuditLogRow[]): string {
         r.summary ?? "",
         r.changed.join(" | "),
         r.route ?? "",
-        r.ipAddress ?? "",
       ]
         .map(csvCell)
         .join(","),
