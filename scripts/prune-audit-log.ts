@@ -1,9 +1,14 @@
 /**
  * Delete audit_log rows older than the retention window.
  *
- * The audit trail is append-only from the application's side — this script is
- * the only thing that removes rows. Safe to run repeatedly; run it from cron
- * (monthly is plenty) or by hand.
+ * NOT SCHEDULED. By decision (2026-09-15) audit entries are kept indefinitely,
+ * so this runs only when a person runs it — there is no cron entry, no
+ * workflow step and no npm script wiring it up, and adding one is a policy
+ * change, not a tidy-up. It exists so that bounding the table is a single
+ * command when the time comes.
+ *
+ * The audit trail is append-only from the application's side, so this script
+ * is the only thing that can remove rows. Safe to run repeatedly.
  *
  *   npx tsx scripts/prune-audit-log.ts             # delete, 365-day default
  *   npx tsx scripts/prune-audit-log.ts --dry-run   # report only, delete nothing

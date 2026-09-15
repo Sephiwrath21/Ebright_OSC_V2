@@ -9,7 +9,7 @@ import { PRIMARY_KEYS } from "@/lib/audit/primary-keys";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Audit Log · Ebright HR System",
+  title: "Log · Ebright HR System",
 };
 
 export default async function AuditLogPage() {

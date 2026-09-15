@@ -485,3 +485,30 @@ jobs:
               exit 1
             fi
             echo "Health check OK — HTTP $HEALTH_OK on :$HEALTH_PORT" >> ~/deploy.log 2>&1
+
+            # Import the commits this deploy just shipped into the hotfix log
+            # (the superadmin-only /hotfix-log changelog). Production only:
+            # a staging deploy would file not-yet-live work as "shipped".
+            #
+            # The HOST runs git — the repo is on disk, hard-reset to
+            # origin/main above — and pipes the log into the container, which
+            # is where DATABASE_URL and the tsx toolchain live. .git is
+            # dockerignored, so the container cannot read history itself;
+            # that asymmetry is the whole reason for the pipe. No GitHub API
+            # call, so no token to store and no rate limit to hit.
+            #
+            # The format string is duplicated from GIT_LOG_FORMAT in
+            # src/lib/hotfix/gitlog.ts (%x1e/%x1f are the same two bytes the
+            # parser splits on) — change one and you must change the other.
+            #
+            # Deliberately non-fatal: the deploy has already succeeded and
+            # been health-checked by this point, so a changelog problem must
+            # not turn a good deploy red. Hence `|| echo` rather than a bare
+            # pipeline, which script_stop would treat as a failed line.
+            #
+            # Shaped as if/fi, and with the pipeline on ONE line, for the same
+            # drone-ssh line-by-line dispatch reason documented above.
+            if [ "${{ github.ref_name }}" = "main" ]; then
+              echo "--- Syncing changelog into hotfix_log ---" >> ~/deploy.log 2>&1
+              git log --no-merges --date=short --name-only --format="%x1e%H%x1f%ad%x1f%an%x1f%s%x1f%b%x1f" -n 500 HEAD 2>>~/deploy.log | docker compose exec -T osc npx tsx scripts/sync-changelog.ts >> ~/deploy.log 2>&1 || echo "changelog sync failed (non-fatal, deploy is healthy)" >> ~/deploy.log 2>&1
+            fi
